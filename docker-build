@@ -1,0 +1,5 @@
+docker build . \
+    -t globus-connect-server:v5.4 \
+    -t globus-connect-server:latest \
+    -t gcs:v5.4 \
+    -t gcs:latest

@@ -14,7 +14,6 @@ RUN \
     apt-get update; \
     apt-get install -y globus-connect-server54
 
-COPY entrypoint.py /entrypoint.py
 COPY entrypoint.sh /entrypoint.sh
 
 # These are the default ports in use by GCSv5.4. Currently, they can not be changed.

@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# $1 - client_id
+# $2 - deployment-key
+# $GLOBUS_CLIENT_SECRET - client_secret
+
+if [[ -z "$1" || -z "$2" || -z "$GLOBUS_CLIENT_SECRET" ]]
+then
+    echo Usage: GLOBUS_CLIENT_SECRET='<secret>' `basename $0` '<client_id>' '<deployment_key>'
+    exit 1
+fi
+
+client_id=$1
+client_secret=$GLOBUS_CLIENT_SECRET
+deployment_key=$2
+
+if [[ ! -f "$deployment_key" || ! -s "$deployment_key" ]]
+then
+    echo Deployment key is missing.
+    exit 1
+fi
+
+tmpfile=$(mktemp /tmp/docker-run-gcs.envXXXXXX)
+echo "GLOBUS_CLIENT_ID=$client_id" > $tmpfile
+echo "GLOBUS_CLIENT_SECRET=$client_secret" >> $tmpfile
+echo GCS_DEPLOYMENT_KEY=`cat $deployment_key` >> $tmpfile
+
+docker run \
+    --rm \
+    --detach \
+    --network host \
+    --env-file $tmpfile \
+    globus-connect-serverv54:latest
+
+rm $tmpfile

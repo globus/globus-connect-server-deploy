@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# Build it
+docker build . -t globus-connect-serverv54:latest
+# Find the package version
+gcs_version=`docker run --rm -it --entrypoint="dpkg" globus-connect-serverv54:latest -s globus-connect-server54 | grep '^Version:' | awk -F: '{print $2}' | tr -d ' \r' |  sed 's,+gcs.*,,g'`
+# Tag the image with the package version
+docker tag globus-connect-serverv54:latest globus-connect-server:$gcs_version

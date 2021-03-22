@@ -2,7 +2,7 @@
 
 # $GLOBUS_CLIENT_ID = <client_id>
 # $GLOBUS_CLIENT_SECRET = <client_secret>
-# $GCS_DEPLOYMENT_KEY = <endpoint_deployment_key>
+# $DEPLOYMENT_KEY = <endpoint_deployment_key>
 
 if [ -z "$GLOBUS_CLIENT_ID" ]
 then
@@ -16,14 +16,14 @@ then
     exit 1
 fi
 
-if [ -z "$GCS_DEPLOYMENT_KEY" ]
+if [ -z "$DEPLOYMENT_KEY" ]
 then
-    echo "Missing environment variable 'GCS_DEPLOYMENT_KEY'. Exitting."
+    echo "Missing environment variable 'DEPLOYMENT_KEY'. Exitting."
     exit 1
 fi
 
 deployment_key="/deployment-key.json"
-echo $GCS_DEPLOYMENT_KEY > $deployment_key
+echo $DEPLOYMENT_KEY > $deployment_key
 chmod 600 $deployment_key
 
 if [ ! -e /systemctl ]
@@ -31,7 +31,12 @@ then
     ln -s /bin/true /systemctl
 fi
 
-PATH=/:$PATH GLOBUS_CLIENT_SECRET=$GLOBUS_CLIENT_SECRET globus-connect-server node setup --client-id $GLOBUS_CLIENT_ID --deployment-key $deployment_key
+PATH=/:$PATH GLOBUS_CLIENT_SECRET=$GLOBUS_CLIENT_SECRET globus-connect-server node setup --client-id $GLOBUS_CLIENT_ID --deployment-key $deployment_key $NODE_SETUP_ARGS
+if [ $? -ne 0 ]
+then
+    echo "node setup failed. Exiting."
+    exit 1
+fi
 
 #
 # Launch Services

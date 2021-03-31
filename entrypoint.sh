@@ -31,7 +31,7 @@ then
     ln -s /bin/true /systemctl
 fi
 
-PATH=/:$PATH GLOBUS_CLIENT_SECRET=$GLOBUS_CLIENT_SECRET globus-connect-server node setup --client-id $GLOBUS_CLIENT_ID --deployment-key $deployment_key $NODE_SETUP_ARGS
+PATH=/:$PATH globus-connect-server node setup --client-id $GLOBUS_CLIENT_ID --deployment-key $deployment_key $NODE_SETUP_ARGS
 if [ $? -ne 0 ]
 then
     echo "node setup failed. Exiting."

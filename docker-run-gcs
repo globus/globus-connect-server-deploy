@@ -115,6 +115,11 @@ echo "GLOBUS_CLIENT_SECRET=$GLOBUS_CLIENT_SECRET" >> $tmpfile
 echo -n DEPLOYMENT_KEY= >> $tmpfile
 cat $DEPLOYMENT_KEY >> $tmpfile
 
+if [ -n "$GLOBUS_SDK_ENVIRONMENT" ]
+then
+    echo "GLOBUS_SDK_ENVIRONMENT=$GLOBUS_SDK_ENVIRONMENT" >> $tmpfile
+fi
+
 docker run \
     --rm \
     --detach \

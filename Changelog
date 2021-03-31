@@ -1,3 +1,9 @@
+1.3.0: Wed Mar 31 22:18:10 2021 +0000
+* docker-build-gcs options allow building an image using packages from
+  the Globus testing or unstable repos
+* docker-run-gcs allows running a container in a specific Globus env
+  if GLOBUS_SDK_ENVIRONMENT is set
+
 1.2.0: Wed Mar 31 19:13:10 2021 +0000
 * Added Changelog
 * Updated the image tag with GCS version & repo versions

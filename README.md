@@ -15,7 +15,7 @@
     <li><a href="#usage">Usage</a></li>
     <li><a href="#extending">Extending</a></li>
     <li><a href="#license">License</a></li>
-    <li><a href="#contact">Contact</a></li>
+    <li><a href="Changelog">Changelog</a></li>
   </ol>
 </details>
 

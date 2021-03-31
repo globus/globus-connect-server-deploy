@@ -2,7 +2,27 @@
 
 # Build it
 docker build . -t globus-connect-serverv54:latest
+if [ $? -ne 0 ]
+then
+    >&2 echo "docker build failed. Exitting."
+    exit 1
+fi
+
+#
+# Build the tag of the form "<gcs_version>-deploy-v<repo_version".
+# Ex. 5.4.16-1-deploy-1.1.0 is GCSv5.4.16-1 and the image was created
+# with deploy repo release version 1.1.0.
+#
+
 # Find the package version
 gcs_version=`docker run --rm -it --entrypoint="dpkg" globus-connect-serverv54:latest -s globus-connect-server54 | grep '^Version:' | awk -F: '{print $2}' | tr -d ' \r' |  sed 's,+gcs.*,,g'`
+# Find the version of this repo
+repo_version=`head -1 Changelog | awk -F: '{print $1}'`
+
+echo "Tagging the new image for GCS $gcs_version and deploy $repo_version"
+TAG="$gcs_version-deploy-$repo_version"
+
 # Tag the image with the package version
-docker tag globus-connect-serverv54:latest globus-connect-server:$gcs_version
+docker tag globus-connect-serverv54:latest globus-connect-server:${TAG}
+
+echo "New image globus-connect-server:${TAG} availabale."

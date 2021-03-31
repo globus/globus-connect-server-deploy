@@ -1,0 +1,13 @@
+1.2.0: Wed Mar 31 19:13:10 2021 +0000
+* Added Changelog
+* Updated the image tag with GCS version & repo versions
+
+1.1.0: Mon Mar 22 17:01:11 2021 +0000
+* docker-run-gcs now accepts the following 'node setup' args:
+   * --incoming-port-range LOW_PORT HIGH_PORT
+   * --outgoing-port-range LOW_PORT HIGH_PORT
+   * -i, --ip-address <ip_address>
+   * --data-interface <ip_address>
+
+1.0.0: Wed Feb 24 15:33:44 2021 +0000
+* Initial version. Latest GCSv5.4 on Ubuntu 20.04

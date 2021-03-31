@@ -1,7 +1,42 @@
 #!/bin/bash
 
+usage() {
+    echo "Usage: `basename $0` [OPTIONS]"
+    echo
+    echo "Options:"
+    echo "  --include-unstable-repos  Install packages from Globus' unstable repos"
+    echo "  --include-testing-repos   Install packages from Globus' testing repos"
+    echo "  -h, --help                Show this message and exit."
+}
+
+DOCKER_BUILD_OPTIONS=
+
+while (( "$#" ))
+do
+  case $1 in
+    --include-unstable-repos)
+      DOCKER_BUILD_OPTIONS="${DOCKER_BUILD_OPTIONS} --build-arg USE_UNSTABLE_REPOS=1"
+      shift
+      ;;
+    --include-testing-repos)
+      DOCKER_BUILD_OPTIONS="${DOCKER_BUILD_OPTIONS} --build-arg USE_TESTING_REPOS=1"
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 1
+      ;;
+    *)
+      echo "Unknown option $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
 # Build it
-docker build --no-cache . -t globus-connect-serverv54:latest
+echo BUILDING WITH $DOCKER_BUILD_OPTIONS
+docker build --no-cache -t globus-connect-serverv54:latest $DOCKER_BUILD_OPTIONS .
 if [ $? -ne 0 ]
 then
     >&2 echo "docker build failed. Exitting."

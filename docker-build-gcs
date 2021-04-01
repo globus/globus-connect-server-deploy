@@ -6,6 +6,7 @@ usage() {
     echo "Options:"
     echo "  --include-unstable-repos  Install packages from Globus' unstable repos"
     echo "  --include-testing-repos   Install packages from Globus' testing repos"
+    echo "  --use-distro              Linux distro to use (ie centos7)"
     echo "  -h, --help                Show this message and exit."
 }
 
@@ -21,6 +22,10 @@ do
     --include-testing-repos)
       DOCKER_BUILD_OPTIONS="${DOCKER_BUILD_OPTIONS} --build-arg USE_TESTING_REPOS=1"
       shift
+      ;;
+    --use-distro)
+      DOCKER_BUILD_OPTIONS="${DOCKER_BUILD_OPTIONS} --file distros/Dockerfile.$2"
+      shift; shift
       ;;
     -h | --help)
       usage
@@ -50,7 +55,8 @@ fi
 #
 
 # Find the package version
-gcs_version=`docker run --rm -it --entrypoint="dpkg" globus-connect-serverv54:latest -s globus-connect-server54 | grep '^Version:' | awk -F: '{print $2}' | tr -d ' \r' |  sed 's,+gcs.*,,g'`
+gcs_version=`docker run --rm -it --entrypoint="globus-connect-server" globus-connect-serverv54:latest --version | awk -F, '{print $2}' | awk '{print $2}'`
+
 # Find the version of this repo
 repo_version=`head -1 Changelog | awk -F: '{print $1}'`
 

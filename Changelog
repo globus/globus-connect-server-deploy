@@ -1,3 +1,8 @@
+1.4.0: Thu Apr  1 20:31:43 UTC 2021
+* 'docker-build-gcs --use-distro <distro>' will use a different OS/version
+  as the base image. For exampke, use '--use-distro centos7' to use
+  distros/Dockerfile.centos7.  See distros/ for supported distros.
+
 1.3.0: Wed Mar 31 22:18:10 2021 +0000
 * docker-build-gcs options allow building an image using packages from
   the Globus testing or unstable repos

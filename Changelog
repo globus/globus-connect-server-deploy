@@ -1,3 +1,6 @@
+1.5.0: Fri Apr 30 17:50:45 UTC 2021
+* Added locale support to centos 7 Dockerfile
+
 1.4.0: Thu Apr  1 20:31:43 UTC 2021
 * 'docker-build-gcs --use-distro <distro>' will use a different OS/version
   as the base image. For exampke, use '--use-distro centos7' to use

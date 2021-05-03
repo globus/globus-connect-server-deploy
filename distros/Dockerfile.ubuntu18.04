@@ -10,10 +10,8 @@ ENV DEBIAN_FRONTEND="noninteractive"
 
 RUN \
     apt-get update                                                                                                 ;\
-    apt-get install -y curl gnupg dialog apt-utils sudo psmisc locales                                             ;\
-    update-locale LANG=C.UTF-8                                                                                     ;\
-    update-locale LC_ALL=C.UTF-8                                                                                   ;\
-    DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata                                                     ;\
+    apt-get install -y curl gnupg dialog apt-utils sudo psmisc                                                     ;\
+    apt-get -y install tzdata                                                                                      ;\
     curl -LOs http://downloads.globus.org/toolkit/gt6/stable/installers/repo/deb/globus-toolkit-repo_latest_all.deb;\
     dpkg -i globus-toolkit-repo_latest_all.deb                                                                     ;\
     sed -i /etc/apt/sources.list.d/globus-toolkit-6-stable*.list -e 's/\^# deb /deb /'                             ;\

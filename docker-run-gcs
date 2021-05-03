@@ -125,6 +125,6 @@ docker run \
     --detach \
     --network host \
     --env-file $tmpfile \
-    globus-connect-serverv54:latest
+    globus-connect-server54:latest
 
 rm $tmpfile

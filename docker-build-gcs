@@ -41,7 +41,7 @@ done
 
 # Build it
 echo BUILDING WITH $DOCKER_BUILD_OPTIONS
-docker build --no-cache -t globus-connect-serverv54:latest $DOCKER_BUILD_OPTIONS .
+docker build --no-cache -t globus-connect-server54:latest $DOCKER_BUILD_OPTIONS .
 if [ $? -ne 0 ]
 then
     >&2 echo "docker build failed. Exitting."
@@ -55,7 +55,7 @@ fi
 #
 
 # Find the package version
-gcs_version=`docker run --rm -it --entrypoint="globus-connect-server" globus-connect-serverv54:latest --version | awk -F, '{print $2}' | awk '{print $2}'`
+gcs_version=`docker run --rm -it --entrypoint="globus-connect-server" globus-connect-server54:latest --version | awk -F, '{print $2}' | awk '{print $2}'`
 
 # Find the version of this repo
 repo_version=`head -1 Changelog | awk -F: '{print $1}'`
@@ -64,6 +64,6 @@ echo "Tagging the new image for GCS $gcs_version and deploy $repo_version"
 TAG="$gcs_version-deploy-$repo_version"
 
 # Tag the image with the package version
-docker tag globus-connect-serverv54:latest globus-connect-server:${TAG}
+docker tag globus-connect-server54:latest globus-connect-server:${TAG}
 
 echo "New image globus-connect-server:${TAG} availabale."

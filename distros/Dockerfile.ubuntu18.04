@@ -5,6 +5,9 @@ LABEL maintainer="support@globus.org"
 ARG USE_UNSTABLE_REPOS
 ARG USE_TESTING_REPOS
 
+ENV LC_ALL C.UTF-8
+ENV DEBIAN_FRONTEND="noninteractive"
+
 RUN \
     apt-get update                                                                                                 ;\
     apt-get install -y curl gnupg dialog apt-utils sudo psmisc locales                                             ;\
@@ -25,7 +28,7 @@ RUN \
         sed -i /etc/apt/sources.list.d/globus-toolkit-6-testing*.list -e 's/\^# deb /deb /'                        ;\
         sed -i /etc/apt/sources.list.d/globus-connect-server-testing*.list -e 's/^# deb /deb /'                    ;\
     fi                                                                                                             ;\
-    apt-key add /usr/share/globus-toolkit-repo/RPM-GPG-KEY-Globus                                                  ;\
+    APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1 apt-key add /usr/share/globus-toolkit-repo/RPM-GPG-KEY-Globus           ;\
     apt-get update                                                                                                 ;\
     apt-get install -y globus-connect-server54
 

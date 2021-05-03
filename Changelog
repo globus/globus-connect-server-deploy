@@ -1,7 +1,8 @@
 1.5.0: Mon May  3 14:31:27 UTC 2021
 * Added locale support to centos 7 Dockerfile
 * Removed ubuntu 18.04 installation warnings
-* Images have the suffix '54' instead of 'v54' to match packaging.
+* Images have the suffix '54' instead of 'v54' to match packaging
+* Fixed container startup for Ubuntu 18.04
 
 1.4.0: Thu Apr  1 20:31:43 UTC 2021
 * 'docker-build-gcs --use-distro <distro>' will use a different OS/version

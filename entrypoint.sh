@@ -26,6 +26,18 @@ deployment_key="/deployment-key.json"
 echo $DEPLOYMENT_KEY > $deployment_key
 chmod 600 $deployment_key
 
+#
+# GCS will check for the existence of this file to make sure this is
+# a supported platform.
+#
+if [ ! -f /bin/systemctl ]
+then
+    ln -s /bin/true /bin/systemctl
+fi
+
+#
+# Setup a fake systemctl hook for relative-path callouts in start scripts.
+#
 if [ ! -e /systemctl ]
 then
     ln -s /bin/true /systemctl

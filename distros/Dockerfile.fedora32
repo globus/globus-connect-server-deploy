@@ -6,6 +6,7 @@ ARG USE_UNSTABLE_REPOS
 ARG USE_TESTING_REPOS
 
 RUN \
+    dnf install -y glibc-langpack-en                                                                                        ;\
     dnf install -y 'dnf-command(config-manager)'                                                                            ;\
     dnf install -y http://downloads.globus.org/toolkit/gt6/stable/installers/repo/rpm/globus-toolkit-repo-latest.noarch.rpm ;\
     dnf config-manager --enable Globus-Connect-Server-5-Stable                                                              ;\

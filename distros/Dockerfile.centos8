@@ -8,6 +8,7 @@ ARG USE_TESTING_REPOS
 #ENV LC_ALL C.UTF-8
 
 RUN \
+    dnf install -y sudo                                                                                                     ;\
     dnf install -y glibc-langpack-en                                                                                        ;\
     dnf install -y 'dnf-command(config-manager)'                                                                            ;\
     dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm                                   ;\

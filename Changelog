@@ -1,3 +1,7 @@
+1.6.0: Tue May 11 18:14:02 UTC 2021
+* Fixed locale issues on CentOS 7 and Fedora 32
+* Updated entrypoint.sh for GCS 5.4.21.
+
 1.5.0: Mon May  3 14:31:27 UTC 2021
 * Added locale support to centos 7 Dockerfile
 * Removed ubuntu 18.04 installation warnings

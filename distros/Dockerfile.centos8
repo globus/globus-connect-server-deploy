@@ -5,27 +5,31 @@ LABEL maintainer="support@globus.org"
 ARG USE_UNSTABLE_REPOS
 ARG USE_TESTING_REPOS
 
-#ENV LC_ALL C.UTF-8
+ARG REPO_PREFIX=https://downloads.globus.org/globus-connect-server
+ARG REPO_SUFFIX=installers/repo/rpm/globus-toolkit-repo-latest.noarch.rpm
 
 RUN \
-    dnf install -y sudo                                                                                                     ;\
-    dnf install -y glibc-langpack-en                                                                                        ;\
-    dnf install -y 'dnf-command(config-manager)'                                                                            ;\
-    dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm                                   ;\
-    dnf install -y http://downloads.globus.org/toolkit/gt6/stable/installers/repo/rpm/globus-toolkit-repo-latest.noarch.rpm ;\
-    dnf config-manager --enable Globus-Connect-Server-5-Stable                                                              ;\
-    dnf config-manager --enable Globus-Toolkit-6-Stable                                                                     ;\
-    if [ -n "$USE_UNSTABLE_REPOS" ]; then                                                                                    \
-        echo "Using unstable package repositories!"                                                                         ;\
-        dnf config-manager --enable Globus-Connect-Server-5-Unstable                                                        ;\
-        dnf config-manager --enable Globus-Toolkit-6-Unstable                                                               ;\
-    fi                                                                                                                      ;\
-    if [ -n "$USE_TESTING_REPOS" ]; then                                                                                     \
-        echo "Using testing package repositories!"                                                                          ;\
-        dnf config-manager --enable Globus-Connect-Server-5-Testing                                                         ;\
-        dnf config-manager --enable Globus-Toolkit-6-Testing                                                                ;\
-    fi                                                                                                                      ;\
-    dnf clean all                                                                                                           ;\
+    dnf install -y sudo                                                                   ;\
+    dnf install -y glibc-langpack-en                                                      ;\
+    dnf install -y 'dnf-command(config-manager)'                                          ;\
+    dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm ;\
+    if [ -n "$USE_UNSTABLE_REPOS" ]; then                                                  \
+        echo "Using unstable package repositories!"                                       ;\
+        dnf install -y $REPO_PREFIX/unstable/$REPO_SUFFIX                                 ;\
+        dnf config-manager --enable Globus-Connect-Server-5-Unstable                      ;\
+        dnf config-manager --enable Globus-Toolkit-6-Unstable                             ;\
+    elif [ -n "$USE_TESTING_REPOS" ]; then                                                 \
+        echo "Using testing package repositories!"                                        ;\
+        dnf install -y $REPO_PREFIX/testing/$REPO_SUFFIX                                  ;\
+        dnf config-manager --enable Globus-Connect-Server-5-Testing                       ;\
+        dnf config-manager --enable Globus-Toolkit-6-Testing                              ;\
+    else                                                                                   \
+        echo "Using stable package repositories!"                                         ;\
+        dnf install -y $REPO_PREFIX/stable/$REPO_SUFFIX                                   ;\
+        dnf config-manager --enable Globus-Connect-Server-5-Stable                        ;\
+        dnf config-manager --disable Globus-Toolkit-6-Stable                              ;\
+    fi                                                                                    ;\
+    dnf clean all                                                                         ;\
     dnf install -y globus-connect-server54
 
 COPY entrypoint.sh /entrypoint.sh

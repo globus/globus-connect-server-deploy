@@ -1,4 +1,4 @@
-FROM debian:10
+FROM ubuntu:21.04
 
 LABEL maintainer="support@globus.org"
 

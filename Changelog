@@ -1,5 +1,8 @@
-1.7.0: Mon May 17 21:05:06 UTC 2021
+1.7.0: Wed May 19 18:29:29 UTC 2021
 * Added Fedora 33, Fedora 34, Ubuntu 20.10, Ubuntu 21.04
+* No longer use GT6 package repositories
+* test and unstable repositories are mutually exclusive. Using either will
+  disable stable (release) repositories
 
 1.6.0: Tue May 11 18:14:02 UTC 2021
 * Fixed locale issues on CentOS 7 and Fedora 32

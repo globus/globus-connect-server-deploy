@@ -6,7 +6,7 @@ ARG USE_UNSTABLE_REPOS
 ARG USE_TESTING_REPOS
 
 ARG REPO_PREFIX=https://downloads.globus.org/globus-connect-server
-ARG REPO_SUFFIX=installers/repo/rpm/globus-toolkit-repo-latest.noarch.rpm
+ARG REPO_SUFFIX=installers/repo/rpm/globus-repo-latest.noarch.rpm
 
 ENV LC_ALL en_US.UTF-8
 
@@ -17,17 +17,15 @@ RUN \
         echo "Using unstable package repositories!"                                       ;\
         yum install -y $REPO_PREFIX/unstable/$REPO_SUFFIX                                 ;\
         yum-config-manager --enable Globus-Connect-Server-5-Unstable                      ;\
-        yum-config-manager --disable Globus-Toolkit-6-Unstable                            ;\
+        yum-config-manager --disable Globus-Connect-Server-5-Stable                       ;\
     elif [ -n "$USE_TESTING_REPOS" ]; then                                                 \
         echo "Using testing package repositories!"                                        ;\
         yum install -y $REPO_PREFIX/testing/$REPO_SUFFIX                                  ;\
         yum-config-manager --enable Globus-Connect-Server-5-Testing                       ;\
-        yum-config-manager --disable Globus-Toolkit-6-Testing                             ;\
+        yum-config-manager --disable Globus-Connect-Server-5-Stable                       ;\
     else                                                                                   \
         echo "Using stable package repositories!"                                         ;\
         yum install -y $REPO_PREFIX/stable/$REPO_SUFFIX                                   ;\
-        yum-config-manager --enable Globus-Connect-Server-5-Stable                        ;\
-        yum-config-manager --disable Globus-Toolkit-6-Stable                              ;\
     fi                                                                                    ;\
     yum clean all                                                                         ;\
     yum install -y globus-connect-server54

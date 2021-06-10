@@ -1,3 +1,6 @@
+1.8.0: Thu Jun 10 13:55:39 UTC 2021
+* EOL Fedora 32
+
 1.7.0: Wed May 19 18:29:29 UTC 2021
 * Added Fedora 33, Fedora 34, Ubuntu 20.10, Ubuntu 21.04
 * No longer use GT6 package repositories

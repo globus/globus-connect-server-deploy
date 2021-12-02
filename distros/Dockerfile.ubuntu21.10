@@ -1,4 +1,4 @@
-FROM ubuntu:20.10
+FROM ubuntu:21.10
 
 LABEL maintainer="support@globus.org"
 
@@ -17,7 +17,7 @@ RUN \
     apt-get -y install tzdata                                                                            ;\
     if [ -n "$USE_UNSTABLE_REPOS" ]; then                                                                 \
         echo "Using unstable package repositories!"                                                      ;\
-        curl -LOs $REPO_PREFIX/stable/$REPO_SUFFIX                                                       ;\
+        curl -LOs $REPO_PREFIX/unstable/$REPO_SUFFIX                                                     ;\
         dpkg -i globus-repo_latest_all.deb                                                               ;\
         sed -i /etc/apt/sources.list.d/globus-connect-server-unstable*.list -e 's/^# deb /deb /'         ;\
         sed -i /etc/apt/sources.list.d/globus-connect-server-stable*.list -e 's/^deb /# deb /'           ;\

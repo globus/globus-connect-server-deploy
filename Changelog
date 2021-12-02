@@ -1,3 +1,11 @@
+1.9.0: Thu Dec  2 22:37:25 UTC 2021
+* EOL Fedora 33 and Ubuntu 20.10
+* Added Alma, Rocky and Oracle Linux and Fedora 35
+* Added Debian 11 and Ubuntu 21.10
+* Fixed some distros that pulled the repo package from stable for unstable
+  builds
+* Fix to allow docker-build-gcs to run without a TTY
+
 1.8.0: Thu Jun 10 13:55:39 UTC 2021
 * EOL Fedora 32
 

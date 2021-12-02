@@ -55,7 +55,7 @@ fi
 #
 
 # Find the package version
-gcs_version=`docker run --rm -it --entrypoint="globus-connect-server" globus-connect-server54:latest --version | awk -F, '{print $2}' | awk '{print $2}'`
+gcs_version=`docker run --rm --entrypoint="globus-connect-server" globus-connect-server54:latest --version | awk -F, '{print $2}' | awk '{print $2}'`
 
 # Find the version of this repo
 repo_version=`head -1 Changelog | awk -F: '{print $1}'`

@@ -66,4 +66,4 @@ TAG="$gcs_version-deploy-$repo_version"
 # Tag the image with the package version
 docker tag globus-connect-server54:latest globus-connect-server:${TAG}
 
-echo "New image globus-connect-server:${TAG} availabale."
+echo "New image globus-connect-server:${TAG} available."

@@ -1,7 +1,0 @@
-Redhat 7,8
-
-Redhat provides base docker images via its own repo at registry.access.redhat.com.
-The Universal Base Images (UBI) are freely available (ubi7, ubi8) and included
-access to UBI-specific repositories. But Globus requires libnice.so.10 which is
-in the rhui repo which is not included in the UBI repos. So until we find a
-workaround, there's no Dockerfile based on RHEL.

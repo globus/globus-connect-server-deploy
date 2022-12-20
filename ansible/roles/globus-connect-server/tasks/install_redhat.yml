@@ -1,0 +1,129 @@
+##################################################
+#      INSTALLATION FOR RedHat DERIVATIVES.
+##################################################
+
+#
+# Ansible facts of interest:
+#
+#  ansible_os_family: RedHat | Springdale
+#  ansible_distribution_major_version: 7 | 8 | 9 | | 35 | 36 | 37
+#  ansible_distribution: AlmaLinux | CentOS | Fedora | OracleLinux | RedHat | Rocky | Springdale
+#
+
+# Import the EPEL key explicitly because the Ansible yum module doesn't auto-import
+# keys they way yum/dnf will
+- name: Install the EPEL RPM repository key
+  become: yes
+  rpm_key:
+    key: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_distribution_major_version }}
+  when:
+    - ansible_distribution != "Fedora"
+
+- name: Install the EPEL repository
+  become: yes
+  yum:
+    name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_distribution_major_version }}.noarch.rpm
+    state: present
+  when:
+    - ansible_distribution != "Fedora"
+
+# Generally always present in EL7 images but let's be sure.
+- name: Install yum-config-manager
+  become: yes
+  yum:
+    name: yum-utils
+    state: present
+  when:
+    - ansible_distribution_major_version == "7"
+
+# Expliclity install this even though it is a soft dependency on the EPEL repo rpm because
+# auto-installation of soft dependencies is configurable and some distros have it disabled.
+- name: Install dnf config-manager
+  become: yes
+  yum:
+    name: dnf-command(config-manager)
+    state: present
+  when:
+    - ansible_distribution_major_version != "7"
+
+# mod_auth_openidc is only a problem on EL8 derivatives (but not RedHat)
+- name: Disable the mod_auth_openidc module stream
+  become: yes
+  ansible.builtin.shell:
+    cmd: dnf module disable -y mod_auth_openidc
+  when:
+    - ansible_distribution_major_version == "8"
+    - ansible_distribution != "RedHat"
+
+# Import the GLOBUS key explicitly because the Ansible yum module doesn't auto-import
+# keys they way yum/dnf will
+- name: Install the GCS RPM repository key
+  become: yes
+  rpm_key:
+    key: https://downloads.globus.org/toolkit/gt6/stable/repo/rpm/RPM-GPG-KEY-Globus
+
+- name: Install the GCS repository definitions
+  become: yes
+  yum:
+    name: https://downloads.globus.org/globus-connect-server/{{ _repo_infixes[gcs_repo] }}/installers/repo/rpm/globus-repo-latest.noarch.rpm
+    state: present
+  when:
+    - gcs_repo != "pre-stable"
+
+- name: Disable the Globus Connect Server stable repositories
+  become: yes
+  ansible.builtin.shell:
+    cmd: "{{ _rhel_pkg_mgr }} --disable Globus-Connect-Server-5-Stable"
+  when:
+    - gcs_repo != "stable"
+    - gcs_repo != "pre-stable"
+
+- name: Enable the Globus Connect Server testing repositories
+  become: yes
+  ansible.builtin.shell:
+    cmd: "{{ _rhel_pkg_mgr }} --enable Globus-Connect-Server-5-Testing"
+  when:
+    - gcs_repo == "testing"
+    - gcs_repo != "pre-stable"
+
+- name: Enable the Globus Connect Server unstable repositories
+  become: yes
+  ansible.builtin.shell:
+    cmd: "{{ _rhel_pkg_mgr }} --enable Globus-Connect-Server-5-Unstable"
+  when:
+    - gcs_repo == "unstable"
+    - gcs_repo != "pre-stable"
+
+- name: Enable the Globus Connect Server pre-stable repositories
+  become: yes
+  copy:
+    dest: /etc/yum.repos.d/globus-connect-server-5-pre-stable.repo
+    content: |
+      [Globus-Connect-Server-5-Pre-Stable]
+      name=Globus Connect Server 5 Pre Stable
+      baseurl=https://builds.globus.org/downloads.globus.org/globus-connect-server/stable/rpm/{{ _dir }}/{{ ansible_distribution_major_version }}/$basearch/
+      failovermethod=priority
+      enabled=1
+      priority=98
+      gpgcheck=1
+      gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Globus
+  vars:
+    _dir: "{{ 'fedora' if (ansible_distribution == 'Fedora') else 'el' }}"
+  when:
+    - gcs_repo == "pre-stable"
+
+- name: Enable the Globus Connect Server pre-stable proxy
+  become: yes
+  lineinfile:
+    path: /etc/yum.repos.d/globus-connect-server-5-pre-stable.repo
+    line: proxy=socks5h://{{ gcs_proxy }}
+    insertafter: EOF
+  when:
+    - gcs_repo == "pre-stable"
+    - gcs_proxy is defined
+
+- name: Install Globus Connect Server
+  become: yes
+  yum:
+    name: globus-connect-server54
+    state: present

@@ -1,0 +1,678 @@
+# This will fetch lists of tags from official images on dockerhub. These are the
+# URLs like https://hub.docker.com/_/ubuntu and have the 'Docker Official Image'
+# badge.
+#   curl --silent https://hub.docker.com/v2/repositories/library/<repo>/tags?page_size=1000
+
+# This will fetch lists of tags for other projects on dockerhub with URLs like
+# https://hub.docker.com/r/redhat/ubi8:
+#   curl --silent https://hub.docker.com/v2/namespaces/redhat/repositories/ubi9/tags?page_size=1000
+
+# To get the yum variables on a EL9 distribution:
+# /usr/libexec/platform-python -c '
+#     import dnf, json;
+#     db = dnf.dnf.Base();
+#     print(json.dumps(db.conf.substitutions, indent=2))'
+
+# https://repo.almalinux.org/almalinux/
+almalinux-8:
+  tags:
+    # https://hub.docker.com/_/almalinux/tags
+    almalinux:8:
+    almalinux:8.4:
+    almalinux:8.5:
+    almalinux:8.5-20211112:
+    almalinux:8.5-20220306:
+    almalinux:8.5-20220510:
+    almalinux:8.6:
+    almalinux:8.6-20220512:
+    almalinux:8.6-20220706:
+    almalinux:8.6-20220901:
+    almalinux:8.6-20221001:
+    almalinux:8.6-20221101:
+    almalinux:8.7:
+    almalinux:8.7-20221110:
+    almalinux:8.7-20221201:
+    # No python
+    #almalinux:8-minimal:
+    #almalinux:8.4-minimal:
+    #almalinux:8.5-minimal:
+    #almalinux:8.5-minimal-20211112:
+    #almalinux:8.5-minimal-20220306:
+    #almalinux:8.5-minimal-20220510:
+    #almalinux:- almalinux:8.6-minimal:
+    #almalinux:8.6-minimal-20220512:
+    #almalinux:8.6-minimal-20220706:
+    #almalinux:8.6-minimal-20220901:
+    #almalinux:8.6-minimal-20221001:
+    #almalinux:8.6-minimal-20221101:
+    #almalinux:8.7-minimal:
+    #almalinux:8.7-minimal-20221110:
+    #almalinux:8.7-minimal-20221201:
+
+
+# https://repo.almalinux.org/almalinux/
+almalinux-9:
+  tags:
+    # https://hub.docker.com/_/almalinux/tags
+    almalinux:9:
+    almalinux:9.0:
+    almalinux:9.0-20220507:
+    almalinux:9.0-20220527:
+    almalinux:9.0-20220706:
+    almalinux:9.0-20220901:
+    almalinux:9.0-20221001:
+    almalinux:9.0-20221101:
+    almalinux:9.0-20221102:
+    almalinux:9.0-beta1:
+    almalinux:9.1:
+    almalinux:9.1-20221117:
+    almalinux:9.1-20221201:
+    almalinux:latest:
+    # Added for convenience
+    almalinux:
+    # No python
+    #almalinux:9-minimal:
+    #almalinux:9.0-minimal:
+    #almalinux:9.0-minimal-20220507:
+    #almalinux:9.0-minimal-20220527:
+    #almalinux:9.0-minimal-20220706:
+    #almalinux:9.0-minimal-20220901:
+    #almalinux:9.0-minimal-20221001:
+    #almalinux:9.0-minimal-20221101:
+    #almalinux:9.0-minimal-20221102:
+    #almalinux:9.0-minimal-beta1:
+    #almalinux:9.1-minimal:
+    #almalinux:9.1-minimal-20221117:
+    #almalinux:9.1-minimal-20221201:
+    #almalinux:minimal:
+
+
+# buster
+debian-10:
+  stages:
+    -
+      dockerfile: data/Dockerfile.debian
+  tags:
+    # https://hub.docker.com/_/debian
+    debian:10:
+    debian:10-slim:
+    debian:10.13:
+    debian:10.13-slim:
+    debian:buster:
+    debian:buster-20221024:
+    debian:buster-20221024-slim:
+    debian:buster-20221114:
+    debian:buster-20221114-slim:
+    debian:buster-20221205:
+    debian:buster-20221205-slim:
+    debian:buster-slim:
+
+
+# bullseye
+debian-11:
+  stages:
+    -
+      dockerfile: data/Dockerfile.debian
+  tags:
+    # https://hub.docker.com/_/debian
+    debian:11:
+    debian:11-slim:
+    debian:11.5:
+    debian:11.5-slim:
+    debian:bullseye:
+    debian:bullseye-20221004:
+    debian:bullseye-20221004-slim:
+    debian:bullseye-20221024:
+    debian:bullseye-20221024-slim:
+    debian:bullseye-20221114:
+    debian:bullseye-20221114-slim:
+    debian:bullseye-20221205:
+    debian:bullseye-20221205-slim:
+    debian:bullseye-slim:
+    debian:latest:
+    # Added for convenience
+    debian:
+
+
+# http://mirror.centos.org/centos/
+centos-7:
+  stages:
+    -
+      dockerfile: data/Dockerfile.centos-7
+  tags:
+    # https://hub.docker.com/_/centos
+    centos:7:
+    centos:7.0.1406:
+    centos:7.1.1503:
+    centos:7.2.1511:
+    centos:7.3.1611:
+    centos:7.4.1708:
+    centos:7.5.1804:
+    centos:7.6.1810:
+    centos:7.7.1908:
+    centos:7.8.2003:
+    centos:7.9.2009:
+    centos:centos7:
+    centos:centos7.0.1406:
+    centos:centos7.1.1503:
+    centos:centos7.2.1511:
+    centos:centos7.3.1611:
+    centos:centos7.4.1708:
+    centos:centos7.5.1804:
+    centos:centos7.6.1810:
+    centos:centos7.7.1908:
+    centos:centos7.8.2003:
+    centos:centos7.9.2009:
+
+
+# http://mirror.centos.org/centos/
+centos-8:
+  stages:
+    -
+      dockerfile: data/Dockerfile.centos-8
+  tags:
+    # https://hub.docker.com/_/centos
+    # These all use releasever=8-stream.
+    centos:8:
+    centos:8.1.1911:
+    centos:8.2.2004:
+    centos:8.3.2011:
+    centos:8.4.2105:
+    centos:centos8:
+    centos:centos8.1.1911:
+    centos:centos8.2.2004:
+    centos:centos8.3.2011:
+    centos:centos8.4.2105:
+    centos:latest:
+    # These do not exist on dockerhub
+    #- centos:8-stream
+    #- centos:8.0.1905
+
+
+# https://mirror.stream.centos.org/9-stream/
+# https://centos.org/keys/
+centos-9:
+  stages:
+    -
+      dockerfile: data/Dockerfile.build
+      vars:
+        BASE_IMAGE: almalinux:9
+        YUM_OPTIONS: >
+          -c /yum/yum.conf
+          --releasever=9-stream
+          --enablerepo centos-baseos
+          --enablerepo centos-appstream
+        RELEASE_PKG: centos-release
+  tags:
+    # No images on docker hub
+    centos:9:
+    centos:latest:
+    centos:
+
+
+# https://pubmirror2.math.uh.edu/fedora-buffet/fedora/linux/releases/
+fedora:
+  tags:
+    # https://hub.docker.com/_/fedora
+    fedora:35:
+    fedora:36:
+    fedora:37:
+    # Added for convenience
+    fedora:
+
+
+# https://yum.oracle.com/oracle-linux-7.html
+oraclelinux-7:
+  tags:
+    # https://hub.docker.com/_/oraclelinux
+    oraclelinux:7:
+    oraclelinux:7-slim:
+    oraclelinux:7.0:
+    oraclelinux:7.1:
+    oraclelinux:7.2:
+    oraclelinux:7.3:
+    oraclelinux:7.4:
+    oraclelinux:7.5:
+    oraclelinux:7.6:
+    oraclelinux:7.7:
+    oraclelinux:7.8:
+    oraclelinux:7.9:
+
+
+# https://yum.oracle.com/oracle-linux-8.html
+  tags:
+    # https://hub.docker.com/_/oraclelinux
+    oraclelinux:8:
+    oraclelinux:8-slim:
+    oraclelinux:8.0:
+    oraclelinux:8.1:
+    oraclelinux:8.2:
+    oraclelinux:8.3:
+    oraclelinux:8.4:
+    oraclelinux:8.5:
+    oraclelinux:8.6:
+    oraclelinux:8.7:
+
+
+# https://yum.oracle.com/oracle-linux-9.html
+  tags:
+    # https://hub.docker.com/_/oraclelinux
+    oraclelinux:9:
+    oraclelinux:9-slim:
+    # Added for convenience
+    oraclelinux:latest: {alias: oraclelinux:9}
+    oraclelinux: {alias: oraclelinux:9}
+
+
+# https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi/
+# https://access.redhat.com/security/team/key/
+redhat-7:
+  stages:
+    -
+      dockerfile: data/Dockerfile.build
+      vars:
+        BASE_IMAGE: centos:7
+        YUM_OPTIONS: -c /yum/yum.conf --enablerepo redhat-7-os
+        RELEASE_PKG: redhat-release
+    -
+      dockerfile: data/Dockerfile.redhat-7
+  tags:
+    redhat:7:
+
+
+# https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi8/
+redhat-8:
+  stages:
+    -
+      dockerfile: data/Dockerfile.redhat-8
+  tags:
+    # https://hub.docker.com/r/redhat/ubi8
+    redhat/ubi8:8.0:
+    redhat/ubi8:8.0-122:
+    redhat/ubi8:8.0-126:
+    redhat/ubi8:8.0-129:
+    redhat/ubi8:8.0-154:
+    redhat/ubi8:8.0-199:
+    redhat/ubi8:8.0-208:
+    redhat/ubi8:8.1:
+    redhat/ubi8:8.1-277:
+    redhat/ubi8:8.1-328:
+    redhat/ubi8:8.1-397:
+    redhat/ubi8:8.1-406:
+    redhat/ubi8:8.1-408:
+    redhat/ubi8:8.2:
+    redhat/ubi8:8.2-265:
+    redhat/ubi8:8.2-299:
+    redhat/ubi8:8.2-299.1592810498:
+    redhat/ubi8:8.2-299.1594117625:
+    redhat/ubi8:8.2-337:
+    redhat/ubi8:8.2-343:
+    redhat/ubi8:8.2-347:
+    redhat/ubi8:8.3:
+    redhat/ubi8:8.3-199:
+    redhat/ubi8:8.3-227:
+    redhat/ubi8:8.3-289:
+    redhat/ubi8:8.3-297:
+    redhat/ubi8:8.3-297.1618432833:
+    redhat/ubi8:8.4:
+    redhat/ubi8:8.4-199:
+    redhat/ubi8:8.4-203:
+    redhat/ubi8:8.4-203.1622660121:
+    redhat/ubi8:8.4-206:
+    redhat/ubi8:8.4-206.1626828523:
+    redhat/ubi8:8.4-209:
+    redhat/ubi8:8.4-211:
+    redhat/ubi8:8.4-213:
+    redhat/ubi8:8.5:
+    redhat/ubi8:8.5-200:
+    redhat/ubi8:8.5-214:
+    redhat/ubi8:8.5-226:
+    redhat/ubi8:8.5-226.1645809065:
+    redhat/ubi8:8.5-236:
+    redhat/ubi8:8.5-236.1647448331:
+    redhat/ubi8:8.5-236.1648460182:
+    redhat/ubi8:8.5-239:
+    redhat/ubi8:8.5-239.1651231664:
+    redhat/ubi8:8.6:
+    redhat/ubi8:8.6-754:
+    redhat/ubi8:8.6-754.1655117782:
+    redhat/ubi8:8.6-855:
+    redhat/ubi8:8.6-903:
+    redhat/ubi8:8.6-903.1661794351:
+    redhat/ubi8:8.6-943:
+    redhat/ubi8:8.6-943.1665521450:
+    redhat/ubi8:8.6-983:
+    redhat/ubi8:8.6-990:
+    redhat/ubi8:8.7:
+    redhat/ubi8:8.7-1026:
+    redhat/ubi8:8.7-1037:
+    redhat/ubi8:8.7-929:
+    redhat/ubi8:latest:
+    # Added for convenience
+    redhat/ubi8:
+    # https://hub.docker.com/r/redhat/ubi8-init
+    redhat/ubi8-init:8.0:
+    redhat/ubi8-init:8.0-13:
+    redhat/ubi8-init:8.0-15:
+    redhat/ubi8-init:8.0-20:
+    redhat/ubi8-init:8.0-22:
+    redhat/ubi8-init:8.0-7:
+    redhat/ubi8-init:8.1:
+    redhat/ubi8-init:8.1-14:
+    redhat/ubi8-init:8.1-19:
+    redhat/ubi8-init:8.1-28:
+    redhat/ubi8-init:8.1-45:
+    redhat/ubi8-init:8.1-49:
+    redhat/ubi8-init:8.2:
+    redhat/ubi8-init:8.2-11:
+    redhat/ubi8-init:8.2-13:
+    redhat/ubi8-init:8.2-2:
+    redhat/ubi8-init:8.2-20:
+    redhat/ubi8-init:8.3:
+    redhat/ubi8-init:8.3-13:
+    redhat/ubi8-init:8.3-17:
+    redhat/ubi8-init:8.3-19:
+    redhat/ubi8-init:8.3-65:
+    redhat/ubi8-init:8.3-65.1618434163:
+    redhat/ubi8-init:8.4:
+    redhat/ubi8-init:8.4-11:
+    redhat/ubi8-init:8.4-13:
+    redhat/ubi8-init:8.4-15:
+    redhat/ubi8-init:8.4-6:
+    redhat/ubi8-init:8.4-7:
+    redhat/ubi8-init:8.4-9:
+    redhat/ubi8-init:8.4-9.1626835874:
+    redhat/ubi8-init:8.5:
+    redhat/ubi8-init:8.5-10:
+    redhat/ubi8-init:8.5-10.1645811924:
+    redhat/ubi8-init:8.5-12:
+    redhat/ubi8-init:8.5-12.1647450483:
+    redhat/ubi8-init:8.5-12.1648464555:
+    redhat/ubi8-init:8.5-14:
+    redhat/ubi8-init:8.5-14.1651233343:
+    redhat/ubi8-init:8.5-4:
+    redhat/ubi8-init:8.5-8:
+    redhat/ubi8-init:8.6:
+    redhat/ubi8-init:8.6-1034:
+    redhat/ubi8-init:8.6-1035:
+    redhat/ubi8-init:8.6-798:
+    redhat/ubi8-init:8.6-798.1655140548:
+    redhat/ubi8-init:8.6-906:
+    redhat/ubi8-init:8.6-954:
+    redhat/ubi8-init:8.6-954.1661796202:
+    redhat/ubi8-init:8.6-995:
+    redhat/ubi8-init:8.6-995.1665583685:
+    redhat/ubi8-init:8.7:
+    redhat/ubi8-init:8.7-6:
+    redhat/ubi8-init:8.7-7:
+    redhat/ubi8-init:8.7-9:
+    redhat/ubi8-init:latest:
+    # Added for convenience
+    redhat/ubi8-init:
+    # https://hub.docker.com/r/redhat/ubi8-minimal (no dnf)
+    # https://hub.docker.com/r/redhat/ubi8-micro (no rpm)
+    # Added for convenience
+    redhat:8: {alias: redhat/ubi8:latest}
+
+
+# https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/
+redhat-9:
+  stages:
+    -
+      dockerfile: data/Dockerfile.redhat-9
+  tags:
+    # https://hub.docker.com/r/redhat/ubi9
+    redhat/ubi9:9.0.0:
+    redhat/ubi9:9.0.0-1468:
+    redhat/ubi9:9.0.0-1468.1655190709:
+    redhat/ubi9:9.0.0-1571:
+    redhat/ubi9:9.0.0-1576:
+    redhat/ubi9:9.0.0-1604:
+    redhat/ubi9:9.0.0-1640:
+    redhat/ubi9:9.0.0-1640.1665068441:
+    redhat/ubi9:9.0.0-1640.1666621574:
+    redhat/ubi9:9.0.0-1690:
+    redhat/ubi9:9.0.0-1703:
+    redhat/ubi9:9.1.0:
+    redhat/ubi9:9.1.0-1646:
+    redhat/ubi9:9.1.0-1646.1669023907:
+    redhat/ubi9:9.1.0-1646.1669627755:
+    redhat/ubi9:latest:
+    # Added for convenience
+    redhat/ubi9:
+    # https://hub.docker.com/r/redhat/ubi9-init
+    redhat/ubi9-init:9.0.0:
+    redhat/ubi9-init:9.0.0-16:
+    redhat/ubi9-init:9.0.0-16.1655192132:
+    redhat/ubi9-init:9.0.0-19:
+    redhat/ubi9-init:9.0.0-23:
+    redhat/ubi9-init:9.0.0-26:
+    redhat/ubi9-init:9.0.0-26.1665072052:
+    redhat/ubi9-init:9.0.0-26.1666626006:
+    redhat/ubi9-init:9.0.0-28:
+    redhat/ubi9-init:9.0.0-29:
+    redhat/ubi9-init:9.1.0:
+    redhat/ubi9-init:9.1.0-5:
+    dhat/ubi9-init:9.1.0-5.1669025017:
+    redhat/ubi9-init:9.1.0-5.1669633213:
+    redhat/ubi9-init:latest:
+    # Added for convenience
+    redhat/ubi9-init:
+    # https://hub.docker.com/r/redhat/ubi9-minimal (no dnf)
+    # https://hub.docker.com/r/redhat/ubi9-micro (no dnf)
+    redhat: {alias: redhat/ubi9:latest}
+    redhat:9: {alias: redhat/ubi9:latest}
+    redhat:latest: {alias: redhat/ubi9:latest}
+
+
+# http://dl.rockylinux.org/pub/rocky/
+rockylinux-8:
+  tags:
+    # https://hub.docker.com/_/rockylinux
+    rockylinux:8:
+    rockylinux:8.5:
+    rockylinux:8.5.20220308:
+    rockylinux:8.6:
+    rockylinux:8.6.20227707:
+    # Minimal images have no dnf/rpm
+    #rockylinux:8-minimal:
+    #rockylinux:8.6-minimal:
+    #rockylinux:8.6.20220707-minimal:
+    #XXX rockylinux:8.4:
+    # Added for convenience
+    rockylinux:8.7: {alias: rockylinux:8}
+
+
+# http://dl.rockylinux.org/pub/rocky/
+rockylinux-9:
+  tags:
+    # https://hub.docker.com/_/rockylinux
+    rockylinux:9:
+    rockylinux:9.0:
+    rockylinux:9.0.20220712:
+    rockylinux:9.0.20220720:
+    # Minimal images have no dnf/rpm
+    #rockylinux:9-minimal:
+    #rockylinux:9.0-minimal:
+    #rockylinux:9.0.20220712-minimal:
+    #rockylinux:9.0.20220720-minimal:
+    # Added for convenience
+    rockylinux:9.1: {alias: rockylinux:9}
+    rockylinux:latest: {alias: rockylinux:9}
+    rockylinux: {alias: rockylinux:9}
+
+
+# http://ftp1.scientificlinux.org/linux/scientific/
+# There will be no Scientific Linux 8.x or 9.x, Fermi moved to centos stream and
+# almalinux.
+scientificlinux-7:
+  tags:
+    # Images do not exist
+    #XXX 7:
+    #XXX 7.0:
+    #XXX 7.1:
+    #XXX 7.2:
+    #XXX 7.3:
+    #XXX 7.4:
+    #XXX 7.5:
+    #XXX 7.6:
+    #XXX 7.7:
+    #XXX 7.8:
+    #XXX 7.9:
+
+
+# http://springdale.princeton.edu/data/springdale/
+# http://springdale.princeton.edu/data/springdale/7/x86_64/os/RPM-GPG-KEY-springdale
+springdale-8:
+  stages:
+    -
+      dockerfile: data/Dockerfile.build
+      replace:
+        - VER
+      vars:
+        BASE_IMAGE: rockylinux:8
+        YUM_OPTIONS: >
+          -c /yum/yum.conf
+          --enablerepo sdl-baseos --enablerepo sdl-baseos-updates
+          --releasever=%VER%
+        RELEASE_PKG: springdale-release
+  tags:
+    springdale:8: {vars: {VER: 8}}
+    springdale:8.0: {vars: {VER: 8.0}}
+    springdale:8.1: {vars: {VER: 8.1}}
+    springdale:8.2: {vars: {VER: 8.2}}
+    springdale:8.3: {vars: {VER: 8.3}}
+    springdale:8.4: {vars: {VER: 8.4}}
+    springdale:8.5: {vars: {VER: 8.5}}
+    springdale:8.6: {vars: {VER: 8.6}}
+    springdale:8.7: {vars: {VER: 8.7}}
+    springdale:latest: {alias: springdale:8}
+
+
+# http://springdale.princeton.edu/data/springdale/
+springdale-9:
+  stages:
+    -
+      dockerfile: data/Dockerfile.build
+      replace:
+        - VER
+      vars:
+        BASE_IMAGE: rockylinux:9
+        YUM_OPTIONS: >
+          -c /yum/yum.conf
+          --enablerepo sdl-baseos --enablerepo sdl-baseos-updates
+          --releasever=%VER%
+        RELEASE_PKG: springdale-release
+  tags:
+    springdale:9: {vars: {VER: 9}}
+    springdale:9.0: {vars: {VER: 9.0}}
+    springdale:9.1: {vars: {VER: 9.1}}
+    springdale:latest: {alias: springdale:9}
+    springdale: {alias: springdale:9}
+
+
+# http://archive.ubuntu.com/ubuntu/dists/bionic/
+# http://archive.ubuntu.com/ubuntu/dists/bionic-updates/
+ubuntu-1804:
+  stages:
+    -
+      dockerfile: data/Dockerfile.debian
+  tags:
+    # https://hub.docker.com/_/ubuntu
+    ubuntu:18.04:
+    ubuntu:bionic:
+    ubuntu:bionic-20210827:
+    ubuntu:bionic-20210930:
+    ubuntu:bionic-20220105:
+    ubuntu:bionic-20220128:
+    ubuntu:bionic-20220301:
+    ubuntu:bionic-20220315:
+    ubuntu:bionic-20220401:
+    ubuntu:bionic-20220415:
+    ubuntu:bionic-20220427:
+    ubuntu:bionic-20220531:
+    ubuntu:bionic-20220801:
+    ubuntu:bionic-20220829:
+    ubuntu:bionic-20220902:
+    ubuntu:bionic-20220913:
+    ubuntu:bionic-20221019:
+    ubuntu:bionic-20221130:
+
+
+# http://archive.ubuntu.com/ubuntu/dists/focal/
+# http://archive.ubuntu.com/ubuntu/dists/focal-updates/
+ubuntu-2004:
+  stages:
+    -
+      dockerfile: data/Dockerfile.debian
+  tags:
+    # https://hub.docker.com/_/ubuntu
+    ubuntu:20.04:
+    ubuntu:focal:
+    ubuntu:focal-20210827:
+    ubuntu:focal-20210921:
+    ubuntu:focal-20211006:
+    ubuntu:focal-20220105:
+    ubuntu:focal-20220113:
+    ubuntu:focal-20220302:
+    ubuntu:focal-20220316:
+    ubuntu:focal-20220404:
+    ubuntu:focal-20220415:
+    ubuntu:focal-20220426:
+    ubuntu:focal-20220531:
+    ubuntu:focal-20220801:
+    ubuntu:focal-20220826:
+    ubuntu:focal-20220922:
+    ubuntu:focal-20221019:
+    ubuntu:focal-20221130:
+
+
+# http://archive.ubuntu.com/ubuntu/dists/jammy/
+# http://archive.ubuntu.com/ubuntu/dists/jammy-updates/
+ubuntu-2204:
+  stages:
+    -
+      dockerfile: data/Dockerfile.debian
+  tags:
+    # https://hub.docker.com/_/ubuntu
+    ubuntu:22.04:
+    ubuntu:jammy:
+    ubuntu:jammy-20211029:
+    ubuntu:jammy-20211122:
+    ubuntu:jammy-20220101:
+    ubuntu:jammy-20220130:
+    ubuntu:jammy-20220301:
+    ubuntu:jammy-20220315:
+    ubuntu:jammy-20220404:
+    ubuntu:jammy-20220421:
+    ubuntu:jammy-20220428:
+    ubuntu:jammy-20220531:
+    ubuntu:jammy-20220801:
+    ubuntu:jammy-20220815:
+    ubuntu:jammy-20221003:
+    ubuntu:jammy-20221020:
+    ubuntu:jammy-20221101:
+    ubuntu:jammy-20221130:
+
+
+# http://archive.ubuntu.com/ubuntu/dists/kinetic/
+# http://archive.ubuntu.com/ubuntu/dists/kinetic-updates/
+ubuntu-2210:
+  stages:
+    -
+      dockerfile: data/Dockerfile.debian
+  tags:
+    # https://hub.docker.com/_/ubuntu
+    ubuntu:22.10:
+    ubuntu:kinetic:
+    ubuntu:kinetic-20220428:
+    ubuntu:kinetic-20220602:
+    ubuntu:kinetic-20220801:
+    ubuntu:kinetic-20220830:
+    ubuntu:kinetic-20220922:
+    ubuntu:kinetic-20221024:
+    ubuntu:kinetic-20221101:
+    ubuntu:kinetic-20221130:
+    ubuntu:latest:
+    # Added for convenience
+    ubuntu:

@@ -1,0 +1,5 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+# The image doesn't have a valid locale setting
+ENV LC_ALL=en_US.utf8

@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1.3-labs
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+# The available rhel:8 image is missing libnice and it's hidden behind a
+# subscription wall. We'll grab it from CentOS 8 stream.
+
+COPY <<EOF /etc/yum.repos.d/centos-8-stream.repo
+[appstream]
+name=CentOS Linux \$releasever - AppStream
+mirrorlist=http://mirrorlist.centos.org/?release=8-stream&arch=\$basearch&repo=AppStream&infra=\$infra
+gpgcheck=1
+enabled=1
+EOF
+
+RUN <<EOF
+set -e
+rpm --import https://centos.org/keys/RPM-GPG-KEY-CentOS-Official
+dnf install -y libnice
+dnf clean all
+rm /etc/yum.repos.d/centos-8-stream.repo
+EOF

@@ -1,0 +1,8 @@
+- name: Install GCS packages
+  vars:
+    _standardize_family:
+        RedHat: redhat
+        Springdale: redhat
+        Debian: debian
+  include_tasks:
+    file: "install_{{ _standardize_family[ansible_os_family] }}.yml"

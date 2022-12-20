@@ -1,0 +1,67 @@
+##################################################
+#     INSTALLATION FOR Ubuntu/Debian
+##################################################
+
+#
+# Ansible facts of interest:
+#
+#  ansible_os_family: Debian
+#  ansible_distribution_major_version: 10 | 11 | 18 | 20 | 22
+#  ansible_distribution_release: buster | bullseye | bionic | focal | jammy | kinetic
+#  ansible_distribution: Debian | Ubuntu
+#
+
+- name: Install the GCS repository definitions
+  become: yes
+  apt:
+    deb: https://downloads.globus.org/globus-connect-server/stable/installers/repo/deb/globus-repo_latest_all.deb
+    state: present
+
+- name: Enable the Globus Connect Server {{ gcs_repo }} repositories
+  become: yes
+  replace:
+    path: /etc/apt/sources.list.d/globus-connect-server-stable-{{ ansible_distribution_release }}.list
+    regexp: '^# deb '
+    replace: 'deb '
+  when:
+    - gcs_repo != "stable"
+    - gcs_repo != "pre-stable"
+
+- name: Disable the Globus Connect Server stable repository
+  become: yes
+  replace:
+    path: /etc/apt/sources.list.d/globus-connect-server-stable-{{ ansible_distribution_release }}.list
+    regexp: '^deb '
+    replace: '# deb '
+  when:
+    - gcs_repo != "stable"
+
+- name: Enable the Globus Connect Server pre-stable repository
+  become: yes
+  copy:
+    dest: /etc/apt/sources.list.d/globus-connect-server-pre-stable-{{ ansible_distribution_release }}.list
+    content: |
+      deb [signed-by=/usr/share/globus-repo/RPM-GPG-KEY-Globus.gpg] https://builds.globus.org/downloads.globus.org/globus-connect-server/stable/deb {{ ansible_distribution_release }} contrib
+  when:
+    - gcs_repo == "pre-stable"
+
+- name: Enable the Globus Connect Server pre-stable proxy
+  become: yes
+  copy:
+    dest: /etc/apt/apt.conf.d/gcs_proxy
+    content: |
+      Acquire::http::proxy::builds.globus.org "socks5h://{{ gcs_proxy }}";
+  when:
+    - gcs_repo == "pre-stable"
+    - gcs_proxy is defined
+
+- name: Update the APT cache
+  become: yes
+  apt:
+    update_cache: yes
+
+- name: Install the Globus Connect Server
+  become: yes
+  apt:
+    name: globus-connect-server54
+    state: present

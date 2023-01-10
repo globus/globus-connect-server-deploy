@@ -1,3 +1,6 @@
+2.1.0: Mon Jan  9 09:52:04 CST 2023
+* Debian and Ubuntu Docker images use the correct repo definitions
+
 2.0.0: Tue Dec 20 10:52:03 CST 2022
 * Added Anisble installation support.
 * Overhauled Docker image building to support all GCS-supported distros.

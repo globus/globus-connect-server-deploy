@@ -14,14 +14,16 @@
 - name: Install the GCS repository definitions
   become: yes
   apt:
-    deb: https://downloads.globus.org/globus-connect-server/stable/installers/repo/deb/globus-repo_latest_all.deb
+    deb: https://downloads.globus.org/globus-connect-server/{{ _repo_infixes[gcs_repo] }}/installers/repo/deb/globus-repo_latest_all.deb
     state: present
+  when:
+    - gcs_repo != "pre-stable"
 
 - name: Enable the Globus Connect Server {{ gcs_repo }} repositories
   become: yes
   replace:
-    path: /etc/apt/sources.list.d/globus-connect-server-stable-{{ ansible_distribution_release }}.list
-    regexp: '^# deb '
+    path: /etc/apt/sources.list.d/globus-connect-server-{{ gcs_repo }}-{{ ansible_distribution_release }}.list
+    regexp: '^#\s*deb '
     replace: 'deb '
   when:
     - gcs_repo != "stable"
@@ -31,10 +33,11 @@
   become: yes
   replace:
     path: /etc/apt/sources.list.d/globus-connect-server-stable-{{ ansible_distribution_release }}.list
-    regexp: '^deb '
+    regexp: '^\s*deb '
     replace: '# deb '
   when:
     - gcs_repo != "stable"
+    - gcs_repo != "pre-stable"
 
 - name: Enable the Globus Connect Server pre-stable repository
   become: yes

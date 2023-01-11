@@ -1,3 +1,6 @@
+2.2.0: Wed Jan 11 13:31:08 CST 2023
+* Fixed pre-stable image builds for Debian and Ubuntu
+
 2.1.0: Mon Jan  9 09:52:04 CST 2023
 * Debian and Ubuntu Docker images use the correct repo definitions
 

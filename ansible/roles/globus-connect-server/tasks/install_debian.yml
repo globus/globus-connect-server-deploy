@@ -16,8 +16,6 @@
   apt:
     deb: https://downloads.globus.org/globus-connect-server/{{ _repo_infixes[gcs_repo] }}/installers/repo/deb/globus-repo_latest_all.deb
     state: present
-  when:
-    - gcs_repo != "pre-stable"
 
 - name: Enable the Globus Connect Server {{ gcs_repo }} repositories
   become: yes
@@ -37,7 +35,6 @@
     replace: '# deb '
   when:
     - gcs_repo != "stable"
-    - gcs_repo != "pre-stable"
 
 - name: Enable the Globus Connect Server pre-stable repository
   become: yes

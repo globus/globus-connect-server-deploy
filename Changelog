@@ -1,3 +1,8 @@
+2.3.0: Mon May 22 09:46:16 CDT 2023
+* Updated supported distros.
+  * Removed Fedora 35, Fedora 36, Debian 10 (Buster) and Ubuntu 18.04 (Bionic)
+  * Added Fedora 38, Debian 12 (Bookworm) and Ubuntu 23.04 (Lunar)
+
 2.2.0: Wed Jan 11 13:31:08 CST 2023
 * Fixed pre-stable image builds for Debian and Ubuntu
 

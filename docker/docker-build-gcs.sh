@@ -14,7 +14,7 @@ FINAL_IMAGE_NAME="globus/globus-connect-server:${BASE_IMAGE//:/-}"
 TMP_CONTAINER_NAME="globus-tmp-${BASE_IMAGE//:/-}.install_gcs.$$"
 
 DISTROS_YAML="$(realpath $(dirname ${BASH_SOURCE})/data/distros.yaml)"
-SHYAML="$(realpath $(dirname ${BASH_SOURCE})/venv/bin/shyaml)"
+SHYAML="$(realpath --canonicalize-missing $(dirname ${BASH_SOURCE})/venv/bin/shyaml)"
 DOCKER=docker
 
 ################################################################################

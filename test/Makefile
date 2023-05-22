@@ -4,11 +4,10 @@ DISTROS=\
     centos:7 \
     centos:8 \
     centos:9 \
-    debian:10 \
     debian:11 \
-    fedora:35 \
-    fedora:36 \
+    debian:bookworm \
     fedora:37 \
+    fedora:38 \
     oraclelinux:7 \
     oraclelinux:8 \
     oraclelinux:9 \
@@ -19,10 +18,10 @@ DISTROS=\
     rockylinux:9 \
     springdale:8 \
     springdale:9 \
-    ubuntu:bionic \
     ubuntu:focal \
     ubuntu:jammy \
-    ubuntu:kinetic
+    ubuntu:kinetic \
+    ubuntu:lunar
 
 all:
 	for d in $(DISTROS); do\

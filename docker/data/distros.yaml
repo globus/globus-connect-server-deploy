@@ -87,27 +87,6 @@ almalinux-9:
     #almalinux:minimal:
 
 
-# buster
-debian-10:
-  stages:
-    -
-      dockerfile: data/Dockerfile.debian
-  tags:
-    # https://hub.docker.com/_/debian
-    debian:10:
-    debian:10-slim:
-    debian:10.13:
-    debian:10.13-slim:
-    debian:buster:
-    debian:buster-20221024:
-    debian:buster-20221024-slim:
-    debian:buster-20221114:
-    debian:buster-20221114-slim:
-    debian:buster-20221205:
-    debian:buster-20221205-slim:
-    debian:buster-slim:
-
-
 # bullseye
 debian-11:
   stages:
@@ -129,9 +108,23 @@ debian-11:
     debian:bullseye-20221205:
     debian:bullseye-20221205-slim:
     debian:bullseye-slim:
-    debian:latest:
-    # Added for convenience
-    debian:
+
+
+# bookworm
+debian-12:
+  stages:
+    -
+      dockerfile: data/Dockerfile.debian
+  tags:
+    # https://hub.docker.com/_/debian
+    debian:bookworm-slim:
+    debian:bookworm-20230502-slim:
+    debian:bookworm-20230502:
+    debian:bookworm:
+    debian:bookworm-20230411-slim:
+    debian:bookworm-20230411:
+    debian:bookworm-20230320-slim:
+    debian:bookworm-20230320:
 
 
 # http://mirror.centos.org/centos/
@@ -214,9 +207,8 @@ centos-9:
 fedora:
   tags:
     # https://hub.docker.com/_/fedora
-    fedora:35:
-    fedora:36:
     fedora:37:
+    fedora:38:
     # Added for convenience
     fedora:
 
@@ -502,25 +494,6 @@ rockylinux-9:
     rockylinux: {alias: rockylinux:9}
 
 
-# http://ftp1.scientificlinux.org/linux/scientific/
-# There will be no Scientific Linux 8.x or 9.x, Fermi moved to centos stream and
-# almalinux.
-scientificlinux-7:
-  tags:
-    # Images do not exist
-    #XXX 7:
-    #XXX 7.0:
-    #XXX 7.1:
-    #XXX 7.2:
-    #XXX 7.3:
-    #XXX 7.4:
-    #XXX 7.5:
-    #XXX 7.6:
-    #XXX 7.7:
-    #XXX 7.8:
-    #XXX 7.9:
-
-
 # http://springdale.princeton.edu/data/springdale/
 # http://springdale.princeton.edu/data/springdale/7/x86_64/os/RPM-GPG-KEY-springdale
 springdale-8:
@@ -569,34 +542,6 @@ springdale-9:
     springdale:9.1: {vars: {VER: 9.1}}
     springdale:latest: {alias: springdale:9}
     springdale: {alias: springdale:9}
-
-
-# http://archive.ubuntu.com/ubuntu/dists/bionic/
-# http://archive.ubuntu.com/ubuntu/dists/bionic-updates/
-ubuntu-1804:
-  stages:
-    -
-      dockerfile: data/Dockerfile.debian
-  tags:
-    # https://hub.docker.com/_/ubuntu
-    ubuntu:18.04:
-    ubuntu:bionic:
-    ubuntu:bionic-20210827:
-    ubuntu:bionic-20210930:
-    ubuntu:bionic-20220105:
-    ubuntu:bionic-20220128:
-    ubuntu:bionic-20220301:
-    ubuntu:bionic-20220315:
-    ubuntu:bionic-20220401:
-    ubuntu:bionic-20220415:
-    ubuntu:bionic-20220427:
-    ubuntu:bionic-20220531:
-    ubuntu:bionic-20220801:
-    ubuntu:bionic-20220829:
-    ubuntu:bionic-20220902:
-    ubuntu:bionic-20220913:
-    ubuntu:bionic-20221019:
-    ubuntu:bionic-20221130:
 
 
 # http://archive.ubuntu.com/ubuntu/dists/focal/
@@ -673,6 +618,14 @@ ubuntu-2210:
     ubuntu:kinetic-20221024:
     ubuntu:kinetic-20221101:
     ubuntu:kinetic-20221130:
-    ubuntu:latest:
-    # Added for convenience
-    ubuntu:
+
+# http://archive.ubuntu.com/ubuntu/dists/lunar/
+# http://archive.ubuntu.com/ubuntu/dists/lunar-updates/
+ubuntu-2304:
+  stages:
+    -
+      dockerfile: data/Dockerfile.debian
+  tags:
+    # https://hub.docker.com/_/ubuntu
+    ubuntu:23.04:
+    ubuntu:lunar:

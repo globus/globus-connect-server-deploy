@@ -1,3 +1,6 @@
+2.4.0: Tue Aug  8 16:28:03 CDT 2023
+* Fix missing sudo command from Debian and Ubuntu images
+
 2.3.0: Mon May 22 09:46:16 CDT 2023
 * Updated supported distros.
   * Removed Fedora 35, Fedora 36, Debian 10 (Buster) and Ubuntu 18.04 (Bionic)

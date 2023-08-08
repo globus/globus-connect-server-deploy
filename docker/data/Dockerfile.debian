@@ -8,6 +8,6 @@ ENV LANG=C.UTF-8
 
 RUN <<EOF1
     apt update
-    apt install -y python3 python3-venv
+    apt install -y python3 python3-venv sudo
 EOF1
 

@@ -1,0 +1,168 @@
+# syntax=docker/dockerfile:1.3-labs
+
+############## STAGE 1 - Prepare the image for GCS installation ################
+FROM ubuntu:22.10
+
+# Prereqs
+RUN <<EOF
+    set -e
+    apt update
+    apt install -y coreutils gzip python3 python3-venv sudo tar
+EOF
+
+##################### STAGE 2 - Install GCS using Ansible ######################
+# This is the base64 compressed tar of the ansible repo directory
+COPY <<EOF /ansible.64
+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
+OeSQQw45PAn8DwpOKaEAeAAA
+EOF
+
+RUN <<EOF
+    set -e
+    /usr/bin/python3 -m venv /venv
+    /venv/bin/pip install --upgrade pip
+    /venv/bin/pip install ansible
+    cat /ansible.64 | base64 -d | (cd /; tar zxf -)
+EOF
+
+#COPY <<EOF /ansible/playbook.yml
+#- hosts: all
+#  roles:
+#    - globus-connect-server
+#EOF
+
+ARG GLOBUS_ANSIBLE_OPTIONS
+
+RUN <<EOF
+    (cd /ansible; /venv/bin/ansible-playbook playbook.yml ${GLOBUS_ANSIBLE_OPTIONS})
+EOF
+
+######################### STAGE 3 - Prepare GCS Image ##########################
+LABEL maintainer="support@globus.org"
+
+# This is the base64 compressed tar of entrypoint.sh
+COPY <<EOF /entrypoint.64
+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
+EOF
+
+RUN <<EOF
+    cat /entrypoint.64 | base64 -d | tar zxf - > /entrypoint.sh
+EOF
+
+# These are the default ports in use by GCSv5.4. Currently, they can not be changed.
+#   443 : HTTPD service for GCS Manager API and HTTPS access to collections
+#  50000-51000 : Default port range for incoming data transfer tasks
+EXPOSE 443/tcp 50000-51000/tcp
+
+# Default command unless overriden with 'docker run --entrypoint'
+ENTRYPOINT ["/entrypoint.sh"]
+# Default options to ENTRYPOINT unless overriden with 'docker run arg1...'
+CMD []

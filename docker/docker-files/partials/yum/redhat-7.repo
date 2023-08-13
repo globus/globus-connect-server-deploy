@@ -1,0 +1,6 @@
+[redhat-7-os]
+name = Red Hat Universal Base Image 7 (RPMs) - OS
+baseurl = https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi/server/7/7Server/x86_64/os/
+enabled = 1
+gpgkey = file:///yum/RPM-GPG-KEY-Redhat
+gpgcheck = 1

@@ -1,6 +1,0 @@
-ARG BASE_IMAGE
-FROM ${BASE_IMAGE}
-
-# Looking at http://mirror.centos.org/centos/, it seems that all CentOS 8
-# release versions use the same releasever (8-stream).
-RUN echo 8-stream > /etc/yum/vars/releasever

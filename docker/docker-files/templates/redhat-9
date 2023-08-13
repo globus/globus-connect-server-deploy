@@ -1,0 +1,29 @@
+# syntax=docker/dockerfile:1.3-labs
+
+############## STAGE 1 - Prepare the image for GCS installation ################
+FROM redhat/ubi9
+
+RUN <<EOF
+    yum install -y coreutils-single gzip sudo tar util-linux
+EOF
+
+#
+# The Redhat repo doesn't have the remaining dependencies. Grab them from Rocky.
+#
+
+# This is the base64 of partials/yum/
+COPY <<EOF /yum.64
+$YUM_64
+EOF
+
+RUN <<EOF
+    set -e
+    cat /yum.64 | base64 -d | (cd /; tar zxf -)
+    yum install -y -c /yum/rockylinux.repo cjose python3
+EOF
+
+##################### STAGE 2 - Install GCS using Ansible ######################
+$STAGE_2_PARTIAL
+
+######################### STAGE 3 - Prepare GCS Image ##########################
+$STAGE_3_PARTIAL

@@ -1,5 +1,0 @@
-# syntax=docker/dockerfile:1.3-labs
-FROM scratch as stage_copy_root
-
-ARG ROOT=/ROOT
-COPY --from=stage_build_root ${ROOT} /

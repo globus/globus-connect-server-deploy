@@ -63,37 +63,12 @@ git clone https://github.com/globusonline/globus-connect-server-deploy.git
 #### Building a GCS Image
 Build a new image based on the latest stable version of Globus Connect Server:
 ```shell
-$ ./docker-build-gcs <base_image>
+$ ./docker-build-gcs <distro>
 ```
 
-The supported base images closely follows the list of [Linux distributions supported by
-Globus Connect Server](https://docs.globus.org/globus-connect-server/v5.4/#supported_linux_distributions) and the most recent updates to this repository. Other docker images may work if they
-are capable of [installing Globus Connect Server](https://docs.globus.org/globus-connect-server/v5.4/#gcsv5-install), however the following base images are verified each release:
-
-- almalinux:8
-- almalinux:9
-- debian:10
-- debian:11
-- centos:7
-- centos:8
-- centos:9
-- fedora:35
-- fedora:36
-- fedora:37
-- oraclelinux:7
-- oraclelinux:8
-- oraclelinux:9
-- redhat:7
-- redhat:8
-- redhat:9
-- rockylinux:8
-- rockylinux:9
-- springdale:8
-- springdale:9
-- ubuntu:bionic
-- ubuntu:focal
-- ubuntu:jammy
-- ubuntu:kinetic
+The supported distros closely follow the list of [Linux distributions supported by
+Globus Connect Server](https://docs.globus.org/globus-connect-server/v5.4/#supported_linux_distributions).
+See [docker/docker-files/templates/](docker-files/templates) for a list of supported distros.
 
 
 After the image has been created, `docker-build-image` will tag the image with `globus/globus-connect-server/<base_image>:<gcs_version>`. Images tagged with the prefix `globus/tmp/` are generated during the build process and can be safely removed without harming the final image. The following shows a GCS image based on Globus Connect Server version 5.4.55 on CentOS 9:

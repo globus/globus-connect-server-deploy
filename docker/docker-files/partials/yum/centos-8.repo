@@ -1,0 +1,6 @@
+[appstream]
+name=CentOS Linux $releasever - AppStream
+mirrorlist=http://mirrorlist.centos.org/?release=8-stream&arch=$basearch&repo=AppStream&infra=$infra
+enabled=1
+gpgkey=file:///yum/RPM-GPG-KEY-CentOS
+gpgcheck=1

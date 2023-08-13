@@ -1,0 +1,47 @@
+;; Caller needs to define these three ARG's:
+;; BOOTSTRAP_IMAGE: The existing docker image that we'll use to create our image.
+;; YUM_OPTIONS: Any options to pass to yum to install the target distro.
+;; RELEASE_PKG: The target distro's base package(s) needed to create the image.
+;;
+;; The resulting image will be base_image
+################################################################################
+# We build the target image in 2 phases:
+#
+# - The first stage will create a root of the target distro using the base
+#   image's commands. This results in a root that contains the yum/rpm commands
+#   of the target distro but with a rpm database in the format used by the base
+#   distro.
+# - The second stage will copy the root to / to create the final image.
+#
+# We'll want to do this twice if the BOOTSTRAP_IMAGE is a different major number
+# than the target image because the yum/rpm database format changes between
+# releases so we'll want the final image to have been built by that distro's
+# tools.
+################################################################################
+
+# Stage 1: Install the target distro into /$ROOT
+FROM ${BOOTSTRAP_IMAGE} as stage_build_root
+
+ARG RELEASE_PKGS
+ARG YUM_OPTIONS
+
+ARG ROOT=/ROOT
+
+# This is the base64 of partials/yum/
+COPY <<EOF /yum.64
+$YUM_64
+EOF
+
+RUN <<EOF
+    set -e
+    cat /yum.64 | base64 -d | (cd /; tar zxf -)
+    mkdir -p ${ROOT}/var/lib/rpm
+    rpm --root ${ROOT} --initdb
+    yum -y ${YUM_OPTIONS} --installroot ${ROOT} install ${RELEASE_PKGS} yum
+EOF
+
+# Stage 2: Copy /$ROOT from stage 1 to /
+FROM scratch as base_image
+
+ARG ROOT=/ROOT
+COPY --from=stage_build_root ${ROOT} /

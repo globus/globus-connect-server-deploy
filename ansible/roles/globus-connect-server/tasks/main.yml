@@ -4,5 +4,6 @@
         RedHat: redhat
         Springdale: redhat
         Debian: debian
+        Suse: suse
   include_tasks:
     file: "install_{{ _standardize_family[ansible_os_family] }}.yml"

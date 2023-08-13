@@ -1,0 +1,15 @@
+[centos-baseos]
+name=CentOS Stream $releasever - BaseOS
+metalink=https://mirrors.centos.org/metalink?repo=centos-baseos-$stream&arch=$basearch&protocol=https,http
+gpgkey=file:///yum/RPM-GPG-KEY-CentOS
+gpgcheck=1
+repo_gpgcheck=1
+enabled=1
+
+[centos-appstream]
+name=CentOS Stream $releasever - AppStream
+metalink=https://mirrors.centos.org/metalink?repo=centos-appstream-$stream&arch=$basearch&protocol=https,http
+gpgkey=file:///yum/RPM-GPG-KEY-CentOS
+gpgcheck=1
+repo_gpgcheck=1
+enabled=1

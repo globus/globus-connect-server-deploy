@@ -1,0 +1,13 @@
+[rockylinux-baseos]
+name=Rocky Linux $releasever - BaseOS
+mirrorlist=https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=BaseOS-$releasever
+gpgcheck=1
+enabled=1
+gpgkey=file:///yum/RPM-GPG-KEY-Rocky
+
+[rockylinux-appstream]
+name=Rocky Linux $releasever - AppStream
+mirrorlist=https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=AppStream-$releasever
+gpgcheck=1
+enabled=1
+gpgkey=file:///yum/RPM-GPG-KEY-Rocky

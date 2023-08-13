@@ -1,0 +1,23 @@
+;;
+;; Prepare the GCS Image
+;;
+LABEL maintainer="support@globus.org"
+
+# This is the base64 compressed tar of entrypoint.sh
+COPY <<EOF /entrypoint.64
+$ENTRYPOINT_64
+EOF
+
+RUN <<EOF
+    cat /entrypoint.64 | base64 -d | tar zxf - > /entrypoint.sh
+EOF
+
+# These are the default ports in use by GCSv5.4. Currently, they can not be changed.
+#   443 : HTTPD service for GCS Manager API and HTTPS access to collections
+#  50000-51000 : Default port range for incoming data transfer tasks
+EXPOSE 443/tcp 50000-51000/tcp
+
+# Default command unless overriden with 'docker run --entrypoint'
+ENTRYPOINT ["/entrypoint.sh"]
+# Default options to ENTRYPOINT unless overriden with 'docker run arg1...'
+CMD []

@@ -1,0 +1,23 @@
+# syntax=docker/dockerfile:1.3-labs
+
+######################## STAGE 0 - Build the base image ####################### 
+
+ARG BOOTSTRAP_IMAGE=almalinux:9
+ARG YUM_OPTIONS='-c /yum/centos-9.repo --releasever=9-stream'
+ARG RELEASE_PKG=centos-release
+
+$STAGE_0_PARTIAL
+
+############## STAGE 1 - Prepare the image for GCS installation ################
+FROM base_image
+
+# Prereqs
+RUN <<EOF
+    dnf install -y coreutils gzip python3 sudo tar util-linux
+EOF
+
+##################### STAGE 2 - Install GCS using Ansible ######################
+$STAGE_2_PARTIAL
+
+######################### STAGE 3 - Prepare GCS Image ##########################
+$STAGE_3_PARTIAL

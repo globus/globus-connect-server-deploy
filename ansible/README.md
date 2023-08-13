@@ -33,7 +33,7 @@ This project provides tools that support the deployment of [Globus Connect Serve
     ```shell
     $ git clone https://github.com/globus/globus-connect-server-deploy.git
     ```
-2. Install Python3 is installed on the target system.
+2. Install Python3 on the target system.
 3. Setup passwordless SSH to the target system to an account that has sudo access.
 4. Run `ansible-playbook --inventory=<target_system>, --user=<remote_user> playbook.yml`.
 

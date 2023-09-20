@@ -17,15 +17,20 @@ if [ ! -f docker-files/Dockerfile.$DISTRO ]; then
 fi
 
 UNVERSIONED_TAG="globus/globus-connect-server:${DISTRO}"
-docker build --progress plain --tag $UNVERSIONED_TAG - < docker-files/Dockerfile.$DISTRO
+docker build \
+    --progress plain \
+    --tag $UNVERSIONED_TAG \
+    --build-arg="GLOBUS_ANSIBLE_OPTIONS=${GLOBUS_ANSIBLE_OPTIONS}" \
+    - < docker-files/Dockerfile.$DISTRO
 
 
 # Get the version of GCS installed in this image
 version=$(
-    ${docker} run \
+    docker run \
         -it --rm \
-        $TAG \
-        /usr/sbin/globus-connect-server --version |
+        --entrypoint /usr/sbin/globus-connect-server \
+        $UNVERSIONED_TAG \
+        --version |
     awk '{print $3}' | sed 's/,//g')
 
 VERSIONED_TAG="${UNVERSIONED_TAG}-${version}"

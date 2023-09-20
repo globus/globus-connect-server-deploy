@@ -14,12 +14,6 @@ RUN <<EOF
     cat /ansible.64 | base64 -d | (cd /; tar zxf -)
 EOF
 
-#COPY <<EOF /ansible/playbook.yml
-#- hosts: all
-#  roles:
-#    - globus-connect-server
-#EOF
-
 ARG GLOBUS_ANSIBLE_OPTIONS
 
 RUN <<EOF

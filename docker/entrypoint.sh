@@ -57,7 +57,6 @@ echo $DEPLOYMENT_KEY > $deployment_key
 chmod 600 $deployment_key
 
 globus-connect-server node setup     \
-    --client-id $GLOBUS_CLIENT_ID    \
     --deployment-key $deployment_key \
     $NODE_SETUP_ARGS
 

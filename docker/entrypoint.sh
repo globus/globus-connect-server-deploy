@@ -96,7 +96,7 @@ ln -s /run/gcs_manager/sock /run/gcs_manager.sock
 # Launch the service. See /lib/systemd/system/gcs_manager.service
 (
     cd /opt/globus/share/web;
-    sudo -u gcsweb -g gcsweb /opt/globus/bin/gunicorn \
+    runuser -u gcsweb -g gcsweb -- /opt/globus/bin/gunicorn \
         --workers 4                                   \
 	--preload api_app                             \
 	--daemon                                      \
@@ -131,7 +131,7 @@ echo 'Launching GCS Assistant'
 # This process syncs Globus configuration between nodes. It will send log
 # messages to stdout which are usually caught by systemd and sent onto 
 # syslog. Instead, you'll see these log messages with 'docker logs'.
-sudo -u gcsweb -g gcsweb /opt/globus/bin/globus-connect-server assistant &
+runuser -u gcsweb -g gcsweb -- /opt/globus/bin/globus-connect-server assistant &
 gcs_manager_assistant_pid=$!
 
 
@@ -167,7 +167,7 @@ httpd_pid=`cat $pidfile`
 ### Launch GridFTP
 ###
 echo 'Launching GridFTP Server'
-sudo -u gcsweb -g gcsweb touch /var/lib/globus-connect-server/gcs-manager/gridftp-key
+runuser -u gcsweb -g gcsweb -- touch /var/lib/globus-connect-server/gcs-manager/gridftp-key
 /usr/sbin/globus-gridftp-server \
     -S \
     -c /etc/gridftp.conf \

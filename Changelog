@@ -1,3 +1,7 @@
+2.8.0: Thu Mar 14 13:19:39 UTC 2024
+* Updated for new deployment key format. Credit dylan@dylex.net
+* switch sudo to runuser. Credit dylan@dylex.net
+
 2.7.0: Wed Sep 20 14:55:55 CDT 2023
 * Fix for image tagging
 

@@ -21,6 +21,7 @@ docker build \
     --progress plain \
     --tag $UNVERSIONED_TAG \
     --build-arg="GLOBUS_ANSIBLE_OPTIONS=${GLOBUS_ANSIBLE_OPTIONS}" \
+    --build-arg CACHEBUST=$(date +%s) \
     - < docker-files/Dockerfile.$DISTRO
 
 

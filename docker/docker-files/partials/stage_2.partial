@@ -16,6 +16,11 @@ EOF
 
 ARG GLOBUS_ANSIBLE_OPTIONS
 
+# Modifying this arg value on the build command line will cause RUN to reinstall
+# Globus instead of using the previous, cached iteration (if it exists). Useful
+# for speeding up re-runs to get newer Globus versions.
+ARG CACHEBUST=1
+
 RUN <<EOF
     (cd /ansible; /venv/bin/ansible-playbook playbook.yml ${GLOBUS_ANSIBLE_OPTIONS})
 EOF

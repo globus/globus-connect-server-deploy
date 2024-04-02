@@ -1,3 +1,8 @@
+2.9.0: Tue Apr  2 09:44:44 CDT 2024
+* Updated docker files with entrypoint.sh updates from 2.8.0
+* Added CACHEBUST arg to docker files to force installing updated GCS versions
+  on to older, cached layers. Useful for speeding up new builds.
+
 2.8.0: Thu Mar 14 13:19:39 UTC 2024
 * Updated for new deployment key format. Credit dylan@dylex.net
 * switch sudo to runuser. Credit dylan@dylex.net

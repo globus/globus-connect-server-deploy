@@ -1,3 +1,7 @@
+2.10.0: Fri May 31 09:42:31 CDT 2024
+* Added support for Fedora 39, 40 and Ubuntu 24.04
+* Removed support for Fedora 37, 38 and Ubuntu 23.04
+
 2.9.0: Tue Apr  2 09:44:44 CDT 2024
 * Updated docker files with entrypoint.sh updates from 2.8.0
 * Added CACHEBUST arg to docker files to force installing updated GCS versions

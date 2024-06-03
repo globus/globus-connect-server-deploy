@@ -5,7 +5,10 @@ FROM opensuse/leap:15.5
 
 # Prereqs
 RUN <<EOF
-    zypper install -y coreutils gzip python3 sudo tar util-linux
+    # Ansible 2.12 will require python38 or newer
+    zypper install -y coreutils gzip python311 sudo tar util-linux
+    # This helps stage 2 (ansible install) find python
+    ln -s /usr/bin/python3.11 /usr/bin/python3
 EOF
 
 ##################### STAGE 2 - Install GCS using Ansible ######################

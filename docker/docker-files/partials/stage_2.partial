@@ -10,6 +10,9 @@ RUN <<EOF
     set -e
     /usr/bin/python3 -m venv /venv
     /venv/bin/pip install --upgrade pip
+    # Install wheel to avoid the warning that setup.py is being used when
+    # installing Ansible
+    /venv/bin/pip install wheel
     /venv/bin/pip install ansible
     cat /ansible.64 | base64 -d | (cd /; tar zxf -)
 EOF

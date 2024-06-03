@@ -12,7 +12,8 @@ $STAGE_0_PARTIAL
 FROM base_image
 
 RUN <<EOF
-    yum install -y coreutils gzip python3 sudo tar util-linux
+    # Ansible 2.12 will require python38 or newer
+    yum install -y coreutils gzip python39 sudo tar util-linux
 EOF
 
 ##################### STAGE 2 - Install GCS using Ansible ######################

@@ -1,3 +1,12 @@
+2.11.0: Mon Jun  3 14:10:17 CDT 2024
+* Fix for innocuous missing readline errors on Debian 12 and Ubuntu 20.04, 22.04
+  and 24.04.
+* Removed support for CentOS 8 which hit EOL on May 31, 2024.
+* Use Python 3.9 on almalinux 8, oraclelinux 8, rockylinux 8 and springdale 8
+  and Python 3.11 on SUSE 15.4 and 15.5 to avoid Ansible deprecation warnings.
+* Fix for innocuous missing device errors on centos 9, redhat 7, springdale 8
+  and 9.
+
 2.10.0: Fri May 31 09:42:31 CDT 2024
 * Added support for Fedora 39, 40 and Ubuntu 24.04
 * Removed support for Fedora 37, 38 and Ubuntu 23.04

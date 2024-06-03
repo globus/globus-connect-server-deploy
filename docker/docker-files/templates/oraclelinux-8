@@ -5,7 +5,8 @@ FROM oraclelinux:8
 
 # Prereqs
 RUN <<EOF
-    dnf install -y coreutils gzip python3 sudo tar util-linux
+    # Ansible 2.12 will require python38 or newer
+    dnf install -y coreutils gzip python39 sudo tar util-linux
 EOF
 
 ##################### STAGE 2 - Install GCS using Ansible ######################

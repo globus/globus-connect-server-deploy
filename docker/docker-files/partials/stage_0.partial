@@ -34,10 +34,41 @@ EOF
 
 RUN <<EOF
     set -e
+
+    # Yum repo definitions
     cat /yum.64 | base64 -d | (cd /; tar zxf -)
     mkdir -p ${ROOT}/var/lib/rpm
     rpm --root ${ROOT} --initdb
+
+    # Create these /dev/ entries to avoid 3rd party postinstall warnings
+    DEV_LIST="null urandom"
+
+    # Create /dev/ in ROOT
+    if [ ! -d ${ROOT}/dev ]; then
+        mkdir ${ROOT}/dev
+        chmod 755 ${ROOT}/dev
+    fi
+
+    # Create the /dev/ entries we need
+    for dev in ${DEV_LIST}; do
+        if [ ! -c ${ROOT}/dev/${dev} ]; then
+            mknod ${ROOT}/dev/${dev} c `stat /dev/${dev} --format="%t %T"`
+            chmod 666 ${ROOT}/dev/${dev}
+            declare ${dev}_CREATED=1
+        fi
+    done
+
     yum -y ${YUM_OPTIONS} --installroot ${ROOT} install ${RELEASE_PKGS} yum
+
+    # Delete any /dev/ entries we create above since they may have incorrect
+    # major/minor device numbers for the target distro (they'll have the major/minor
+    # device numbers of the bootstrap distro).
+    for dev in ${DEV_LIST}; do
+        varname=${dev}_CREATED
+        if [ "${!varname}" = "1" ]; then
+            rm -f /dev/${dev}
+        fi
+    done
 EOF
 
 # Stage 2: Copy /$ROOT from stage 1 to /

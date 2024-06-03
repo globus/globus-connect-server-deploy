@@ -4,7 +4,8 @@
 FROM rockylinux:8
 
 RUN <<EOF
-    yum install -y coreutils-single gzip python3 sudo tar util-linux
+    # Ansible 2.12 will require python38 or newer
+    yum install -y coreutils-single gzip python39 sudo tar util-linux
 EOF
 ##################### STAGE 2 - Install GCS using Ansible ######################
 $STAGE_2_PARTIAL

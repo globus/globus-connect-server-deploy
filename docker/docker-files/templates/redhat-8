@@ -8,7 +8,7 @@ RUN <<EOF
 EOF
 
 #
-# The Redhat repo doesn't have the remaining dependencies. Grab them from CentOS.
+# The Redhat repo doesn't have the remaining dependencies. Grab them from Rocky.
 #
 
 # This is the base64 of partials/yum/
@@ -19,7 +19,7 @@ EOF
 RUN <<EOF
     set -e
     cat /yum.64 | base64 -d | (cd /; tar zxf -)
-    yum install -y -c /yum/centos-8.repo libnice python3
+    yum install -y -c /yum/rockylinux.repo libnice python3
 EOF
 
 ##################### STAGE 2 - Install GCS using Ansible ######################

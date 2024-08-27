@@ -6,11 +6,7 @@
 <details open="open">
   <summary>Table of Contents</summary>
   <ol>
-    <li>
-      <a href="#about-the-project">About The Project</a>
-    <li>
-      <a href="#status-and-limitations">Status and Limitations</a>
-    </li>
+    <li><a href="#about-the-project">About The Project</a></li>
     <li>
       <a href="#how-do-i-use-this-for-installations">
         How do I use this for installations?
@@ -18,7 +14,6 @@
     </li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
-    <li><a href="Changelog">Changelog</a></li>
   </ol>
 </details>
 

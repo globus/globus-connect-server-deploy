@@ -6,11 +6,7 @@
 <details open="open">
   <summary>Table of Contents</summary>
   <ol>
-    <li>
-      <a href="#about-the-project">About The Project</a>
-    <li>
-      <a href="#status-and-limitations">Status and Limitations</a>
-    </li>
+    <li><a href="#about-the-project">About The Project</a></li>
     <li><a href="docker/">Docker Images</a></li>
     <li><a href="ansible/">Ansible Playbook</a></li>
     <li><a href="#license">License</a></li>

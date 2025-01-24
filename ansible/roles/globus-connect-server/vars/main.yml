@@ -3,5 +3,3 @@ _repo_infixes:
   unstable: unstable
   testing: testing
   pre-stable: stable
-
-_rhel_pkg_mgr: "{{ 'yum-config-manager' if (ansible_distribution_major_version == '7') else 'dnf config-manager' }}"

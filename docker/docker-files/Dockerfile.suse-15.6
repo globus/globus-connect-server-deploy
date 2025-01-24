@@ -1,12 +1,16 @@
 # syntax=docker/dockerfile:1.3-labs
 
-############## STAGE 1 - Prepare the image for GCS installation ################
-FROM rockylinux:8
+############### STAGE 1 - Prepare the image for GCS installation ###############
+FROM opensuse/leap:15.6
 
+# Prereqs
 RUN <<EOF
     # Ansible 2.12 will require python38 or newer
-    yum install -y coreutils-single gzip python39 sudo tar util-linux
+    zypper install -y coreutils gzip python311 sudo tar util-linux
+    # This helps stage 2 (ansible install) find python
+    ln -s /usr/bin/python3.11 /usr/bin/python3
 EOF
+
 ##################### STAGE 2 - Install GCS using Ansible ######################
 # This is the base64 compressed tar of the ansible repo directory
 COPY <<EOF /ansible.64

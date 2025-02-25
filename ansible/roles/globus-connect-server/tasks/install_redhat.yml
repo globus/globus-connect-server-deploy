@@ -63,13 +63,12 @@
   ansible.builtin.shell:
     cmd: "{{ _cmd }}"
   vars:
-    _cmd: |-
-      "{{
-          'dnf5 config-manager setopt Globus-Connect-Server-5-Stable.enabled=0'
-          if ansible_distribution_major_version < 41 
-          else
-          'dnf config-manager --disable Globus-Connect-Server-5-Stable'
-       }}"
+    _cmd: |
+      {% if ansible_distribution_major_version|int < 41 %}
+        dnf config-manager --disable Globus-Connect-Server-5-Stable
+      {% else %}
+        dnf5 config-manager setopt Globus-Connect-Server-5-Stable.enabled=0
+      {% endif %}
   when:
     - gcs_repo != "stable"
     - gcs_repo != "pre-stable"
@@ -79,13 +78,12 @@
   ansible.builtin.shell:
     cmd: "{{ _cmd }}"
   vars:
-    _cmd: |-
-      "{{ 
-          'dnf5 config-manager setopt Globus-Connect-Server-5-Testing.enabled=1'
-          if ansible_distribution_major_version < 41 
-          else 
-          'dnf config-manager --enable Globus-Connect-Server-5-Testing'
-       }}"
+    _cmd: |
+      {% if ansible_distribution_major_version|int < 41 %}
+        dnf config-manager --enable Globus-Connect-Server-5-Testing
+      {% else %}
+        dnf5 config-manager setopt Globus-Connect-Server-5-Testing.enabled=1
+      {% endif %}
   when:
     - gcs_repo == "testing"
     - gcs_repo != "pre-stable"
@@ -95,13 +93,12 @@
   ansible.builtin.shell:
     cmd: "{{ _cmd }}"
   vars:
-    _cmd: |-
-      "{{ 
-          'dnf5 config-manager setopt Globus-Connect-Server-5-Unstable.enabled=1'
-          if ansible_distribution_major_version < 41 
-          else 
-          'dnf config-manager --enable Globus-Connect-Server-5-Unstable'
-       }}"
+    _cmd: |
+      {% if ansible_distribution_major_version|int < 41 %}
+        dnf config-manager --enable Globus-Connect-Server-5-Unstable
+      {% else %}
+        dnf5 config-manager setopt Globus-Connect-Server-5-Unstable.enabled=1
+      {% endif %}
   when:
     - gcs_repo == "unstable"
     - gcs_repo != "pre-stable"

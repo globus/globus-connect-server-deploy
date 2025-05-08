@@ -1,3 +1,6 @@
+2.14.0: Thu May  8 10:17:11 AM CDT 2025
+* Fix for Ansible installs on Debian and Ubuntu
+
 2.13.0: Tue Feb 25 10:48:24 AM CST 2025
 * Fix for conditionals used in Ansible for rhel derivatives
 

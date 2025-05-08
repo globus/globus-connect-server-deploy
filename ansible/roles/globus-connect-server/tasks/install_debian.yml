@@ -41,7 +41,7 @@
   copy:
     dest: /etc/apt/sources.list.d/globus-connect-server-pre-stable-{{ ansible_distribution_release }}.list
     content: |
-      deb [signed-by=/usr/share/globus-repo/RPM-GPG-KEY-Globus.gpg] https://builds.globus.org/downloads.globus.org/globus-connect-server/stable/deb {{ ansible_distribution_release }} contrib
+      deb [signed-by=/usr/share/globus-repo/GPG-KEY-Globus.gpg,/usr/share/globus-repo/GPG-KEY-Globus-2024.gpg] https://builds.globus.org/downloads.globus.org/globus-connect-server/stable/deb {{ ansible_distribution_release }} contrib
   when:
     - gcs_repo == "pre-stable"
 

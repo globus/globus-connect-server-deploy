@@ -132,8 +132,18 @@
     - gcs_repo == "pre-stable"
     - gcs_proxy is defined
 
-- name: Install Globus Connect Server
+- name: Install Globus Connect Server (latest)
   become: yes
   yum:
     name: globus-connect-server54
     state: present
+  when:
+    - gcs_version is not defined
+
+- name: Install Globus Connect Server ({{ gcs_version }})
+  become: yes
+  yum:
+    name: globus-connect-server54 = {{ gcs_version }}
+    state: present
+  when:
+    - gcs_version is defined

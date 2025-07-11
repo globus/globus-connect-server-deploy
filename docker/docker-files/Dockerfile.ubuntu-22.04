@@ -164,7 +164,7 @@ EOF
 #  50000-51000 : Default port range for incoming data transfer tasks
 EXPOSE 443/tcp 50000-51000/tcp
 
-# Default command unless overriden with 'docker run --entrypoint'
+# Default command unless overridden with 'docker run --entrypoint'
 ENTRYPOINT ["/entrypoint.sh"]
-# Default options to ENTRYPOINT unless overriden with 'docker run arg1...'
+# Default options to ENTRYPOINT unless overridden with 'docker run arg1...'
 CMD []

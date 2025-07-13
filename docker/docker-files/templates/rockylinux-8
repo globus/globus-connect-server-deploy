@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.3-labs
 
 ############## STAGE 1 - Prepare the image for GCS installation ################
-FROM rockylinux:8
+FROM rockylinux/rockylinux:8-ubi
 
 RUN <<EOF
     # Ansible 2.12 will require python38 or newer

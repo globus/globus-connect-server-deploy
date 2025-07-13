@@ -4,6 +4,7 @@
 * Added support for Fedora 42, AlmaLinux 10, Rocky Linux 10
 * Removed legacy GCS RPM key from ansible role
 * Removed base64-encoded partials from version control
+* Switched bas image for Rocky Linux 8, 9
 
 2.14.0: Thu May  8 10:17:11 AM CDT 2025
 * Fix for Ansible installs on Debian and Ubuntu

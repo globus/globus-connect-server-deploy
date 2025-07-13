@@ -1,0 +1,15 @@
+# syntax=docker/dockerfile:1.3-labs
+
+############## STAGE 1 - Prepare the image for GCS installation ################
+FROM oraclelinux:10
+
+# Prereqs
+RUN <<EOF
+    dnf install -y coreutils gzip python3 sudo tar util-linux gnupg
+EOF
+
+##################### STAGE 2 - Install GCS using Ansible ######################
+$STAGE_2_PARTIAL
+
+######################### STAGE 3 - Prepare GCS Image ##########################
+$STAGE_3_PARTIAL

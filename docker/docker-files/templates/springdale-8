@@ -2,7 +2,7 @@
 
 ######################## STAGE 0 - Build the base image ####################### 
 
-ARG BOOTSTRAP_IMAGE=rockylinux:8
+ARG BOOTSTRAP_IMAGE=rockylinux/rockylinux:8-ubi
 ARG YUM_OPTIONS='-c /yum/springdale.repo --releasever 8'
 ARG RELEASE_PKG=springdale-release
 

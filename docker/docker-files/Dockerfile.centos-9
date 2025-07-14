@@ -24,6 +24,7 @@ ARG RELEASE_PKG=centos-release
 # Stage 1: Install the target distro into /$ROOT
 FROM ${BOOTSTRAP_IMAGE} as stage_build_root
 
+ARG BOOTSTRAP_IMAGE_PREREQS
 ARG RELEASE_PKGS
 ARG YUM_OPTIONS
 
@@ -199,6 +200,11 @@ EOF
 
 RUN <<EOF
     set -e
+
+    if [ -n "${BOOTSTRAP_IMAGE_PREREQS}" ]
+    then
+        yum install -y ${BOOTSTRAP_IMAGE_PREREQS}
+    fi
 
     # Yum repo definitions
     cat /yum.64 | base64 -d | (cd /; tar zxf -)

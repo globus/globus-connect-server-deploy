@@ -1,5 +1,6 @@
 ;; Caller needs to define these three ARG's:
 ;; BOOTSTRAP_IMAGE: The existing docker image that we'll use to create our image.
+;; BOOTSTRAP_IMAGE_PREREQS: Any prereqs needed by the bootstrap image
 ;; YUM_OPTIONS: Any options to pass to yum to install the target distro.
 ;; RELEASE_PKG: The target distro's base package(s) needed to create the image.
 ;;
@@ -22,6 +23,7 @@
 # Stage 1: Install the target distro into /$ROOT
 FROM ${BOOTSTRAP_IMAGE} as stage_build_root
 
+ARG BOOTSTRAP_IMAGE_PREREQS
 ARG RELEASE_PKGS
 ARG YUM_OPTIONS
 
@@ -34,6 +36,11 @@ EOF
 
 RUN <<EOF
     set -e
+
+    if [ -n "${BOOTSTRAP_IMAGE_PREREQS}" ]
+    then
+        yum install -y ${BOOTSTRAP_IMAGE_PREREQS}
+    fi
 
     # Yum repo definitions
     cat /yum.64 | base64 -d | (cd /; tar zxf -)

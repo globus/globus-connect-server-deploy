@@ -2,9 +2,10 @@
 
 ######################## STAGE 0 - Build the base image ####################### 
 
-ARG BOOTSTRAP_IMAGE=rockylinux/rockylinux:8-ubi
-ARG YUM_OPTIONS='-c /yum/springdale.repo --releasever 8'
-ARG RELEASE_PKG=springdale-release
+ARG BOOTSTRAP_IMAGE=almalinux:10
+ARG BOOTSTRAP_IMAGE_PREREQS="gzip"
+ARG YUM_OPTIONS='-c /yum/centos-10.repo --releasever=10-stream'
+ARG RELEASE_PKG=centos-release
 
 ################################################################################
 # We build the target image in 2 phases:
@@ -264,9 +265,9 @@ COPY --from=stage_build_root ${ROOT} /
 ############## STAGE 1 - Prepare the image for GCS installation ################
 FROM base_image
 
+# Prereqs
 RUN <<EOF
-    # Ansible 2.12 will require python38 or newer
-    yum install -y coreutils gzip python39 sudo tar util-linux
+    dnf install -y coreutils gzip python3 sudo tar util-linux gnupg
 EOF
 
 ##################### STAGE 2 - Install GCS using Ansible ######################

@@ -1,0 +1,22 @@
+[baseos]
+name=Rocky Linux $releasever - BaseOS
+mirrorlist=https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=BaseOS-$releasever$rltype
+mirrorlist=https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=BaseOS-$releasever
+mirrorlist=https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=BaseOS-$releasever
+#baseurl=http://dl.rockylinux.org/$contentdir/$releasever/BaseOS/$basearch/os/
+gpgcheck=1
+enabled=1
+countme=1
+metadata_expire=6h
+gpgkey=file:///yum/RPM-GPG-KEY-Rocky-10
+
+[appstream]
+name=Rocky Linux $releasever - AppStream
+mirrorlist=https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=AppStream-$releasever
+#baseurl=http://dl.rockylinux.org/$contentdir/$releasever/AppStream/$basearch/os/
+gpgcheck=1
+enabled=1
+countme=1
+metadata_expire=6h
+gpgkey=file:///yum/RPM-GPG-KEY-Rocky-10
+

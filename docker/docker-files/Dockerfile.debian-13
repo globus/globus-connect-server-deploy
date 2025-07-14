@@ -1,0 +1,176 @@
+# syntax=docker/dockerfile:1.3-labs
+
+############## STAGE 1 - Prepare the image for GCS installation ################
+FROM debian:trixie
+
+# Prereqs
+RUN <<EOF
+    set -e
+    apt update
+    # Resolves: "debconf: (Can't locate Term/ReadLine.pm in @INC" from python install
+    apt install -y libterm-readline-gnu-perl
+    apt install -y \
+        coreutils \
+        gzip \
+        python3 \
+        python3-venv \
+        sudo \
+        tar
+EOF
+
+##################### STAGE 2 - Install GCS using Ansible ######################
+# This is the base64 compressed tar of the ansible repo directory
+COPY <<EOF /ansible.64
+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
+EOF
+
+RUN <<EOF
+    set -e
+    /usr/bin/python3 -m venv /venv
+    /venv/bin/pip install --upgrade pip
+    # Install wheel to avoid the warning that setup.py is being used when
+    # installing Ansible
+    /venv/bin/pip install wheel
+    /venv/bin/pip install ansible
+    cat /ansible.64 | base64 -d | (cd /; tar zxf -)
+EOF
+
+ARG GLOBUS_ANSIBLE_OPTIONS
+
+# Modifying this arg value on the build command line will cause RUN to reinstall
+# Globus instead of using the previous, cached iteration (if it exists). Useful
+# for speeding up re-runs to get newer Globus versions.
+ARG CACHEBUST=1
+
+RUN <<EOF
+    (cd /ansible; /venv/bin/ansible-playbook playbook.yml ${GLOBUS_ANSIBLE_OPTIONS})
+EOF
+
+######################### STAGE 3 - Prepare GCS Image ##########################
+LABEL maintainer="support@globus.org"
+
+# This is the base64 compressed tar of entrypoint.sh
+COPY <<EOF /entrypoint.64
+H4sIAAAAAAAAA+1ZbXPbuBHO1+Ov2MieyJ6GlOSLk45bXye1dTnPxS9jO01v7joKREISThTIAqAU
+Xa//vbsASJGSnJeJ005njA+WBCz2DbvPLmAujVrmmZAm0pNHX2d0cbw4PKTP3ovDbv2Tvj7vPu8+
+6j17cfji2+fdbw+ePer2nnUPnz+C7lfSpzEKbZgCePQr05lkqbmL7mPr/6dj53FnKGRnyPQkCHbu
+dwQ78Pbl9cXZxasjeM0KGU+EHMOrkxtYCDPJCgN6qQ2fJSA08Pc5V2LGpWFpBG80B2ZgmRUKsoUE
+JfQ0Qn4n2SxnRgxTbnlYZofRs+ig94d71z4gA24nHHKm2IwbrjQsOEjOEzAZpNYiaMss4aC5KfI2
+MEXUWiOFkDAXDLicC5VJsgu5zZkSDJXXaAvyh91Xry//+uZmcPL6rH9xOzg7hWP4c5wKpB6I5LtN
+ipv+yXX/tkaleay4sZSn/avXlz+dE9mP/Z+IhsvEpvYg4XmaLUmJwZQvLfXF5Wkf2d2+uRq8vH51
+g+RZbgSFOFox1jDKVNO2Pf4+gjAUeciSRHGt92vq3Zz+OOhf/O3s+vKCFKhzS/icp1lOwhveCMQI
+fobwN2hteKEF/wjMhMsAcPB4kkHrXGhN0VPjUHkT2usM2hH03wtjcEfUclzwJ/SCkbhbrvPtF8p2
+TD5RfvPEPltyc/sHZd53buzAzW3/CnpHmJFyJMYFBj7qDjZgKHRepdmw0DBcgiqkJBvqwfR1cvUi
+UzOWpsun0B5b8WGcScljE2qu5lxBPZwXIk0hL/BPQgBTKt/WXnXkF3vTGEUyMJmUOY9CEAZizAGm
+lpBmMYY5iRA4FcEP2QJDXj0FPLqYE2QgLCC7Raam5AimsgJ5kcQCYS4brWBQQqYSVBThZcLmuFFC
+IXMl5iLlYwQV1MgwIZE58eOOyBLLJLUngAyRV64BkVPzdF5BjYNdVDye8Hhqz4g0wBhBetIT9TAT
+BOKRSC3PGZsiL3ewOC3IIwwn8jxTBnXJU2aQyyyCc6LEUGMwsnsy3IHgjfrFaIDXzfsHmXgn1hRU
+MwhHYAuRc0Vs0iCVEGo3aVTB15eR0RVWECoQK3QDRDf0ImrPnB2LCUcDGjhGOinOUANhgiYwHrc6
+q4kQJ6Jfsei3ApuM6/j6Hew2dwfxZJYl8Lzb3VgJPhaPlK7wi83aMGzqsM7Mk60DuMeV3b9AKDl0
+N7GkJmzE0DeJw4v/JlwclH2ATaZZJoXBMCwzh8Ifi1pRy4ivgBOkzc5OqQdlxTmTbMyVXbKuajeb
+Fb/eLhsCmww2eV5enUGuMgICF/IIDNlCU9tCGcSSmZCUXj7VfDXeRBbqKzAz8ZMV2Bgp8RvJRnBQ
+JV8MYhaTHFqwXVGNW2FnScStYlKPeOVTn/slvvD3PC4Menoc68HMmRXpLJ5yY08EWwlGyx3E7M46
+DaCmKBjZDfmEpaMIzgw5oqBuh+AkzmazQorYGTXkZsE5GpdjqvHOxJg8sUJIz5pbqauz8oiXzBA2
+lDC2vmHtQB0WfAjULI4nBCwYoZS/ROeUtey8CcIgoIwi17Upjjrxp4RCs2zeoNsjNXKRWIjYtyeF
+uDaERChMzgwhnQjGYm4VPSeoRZ3KE4iIu7To5jTAzctZKuS0splkZakzV/KFrRDkFI0aIDd3pHW/
+kE3aEDqPhHeR0zUKgtkU9do4EgQbKlvOQUfeTxtEHkPXpjv2OLceMkWLTw2rhA8juOEIwKkYegBO
+/Gdzv0f4PYsmcQId7AE7Dvk6eoIx3EEl/2RXUTaFN4RFecbhuPoWNnYS7I8prjIlPfY5mKR6Shny
+DD4+fgm+CcNcYSPK8FhyMWB5/vENCeMIUp/AvtyAuibHqOv7o+0+31QJo3CDFCeDfTqJtwzjvazU
+ZcBiTRN4PFqMsbvGiCpsVI6K1BfWANeR6md4bIvqFuZYG5LMOlKnnOfQjQ5xQvKgRjdAuuN3GLZb
+ObwLbLu1wGaCyTGnKxqexETkrouoMq1sBVyw2zCnlkcYStJPiinLp1ZZO9j+bvWtb6vR4kLjDEWN
+k3pQL4U7cMqHgsnOm2EhTeGaaWmwB7Exa3NqsVjgyRt2VH75gFCeau4ZX/METe2cYJm+vOl8z5NM
+sa38nVpH3id38/aFeL1cvcQioA0j5L+jYFUUVLJcwSqrlF7KuOxw16pQCV7UJ2gL7rZd1Jz63myM
+nGbU8I6xPiBiapPQBd7FIpWnQhfUe+MZI1QbAu+y6hAKamrOMmrMXDlChihCIgFLnlJBa1tRZQuL
+yytp9qLfTigSFK3oNnaMn4kfW9svVvoJnjRCv5q3SbD7ONg4h5fu7Cx4bz2GOkE7+MLY9IVWs5Ft
+zCmD3Hbqg2nnOlucB3rWMnYVjSDcOK4izcsuPyPCm08NZEtjzXHwwk3cyaeiY1LdibkyumOvQ5NM
+myhWBu2jDZWNToJjDX/EK1GBZdLeYnBTSg8rE9tbKVfwq26/3GstRcygTsbVzlDrNBzTDUZ57TBv
+nJiVM9Bleo3bymfuFLd6yi65v9ZLlJINeN31W+6EVLt3BaYl/bvN1FYi+f72antSuzVETIrb9sei
+32QFMrRGELxuDX6Cm7CEmzHyH5mcbhvByi9+X7nok8ZfUm7KL7GLAU8VEaaUSyfNpaScL33mYG+b
+FOvsbYXsLuK7S5ojXS9nd/F5F3yNy49tRymF40IpjH2ESZmVV2lb4C/PTk/WX0Wj+7/9jDCiLNgL
+PfAlYcBSbHT39oN/WfdNCfNDvMH28IKLt+F5R9IbycF3T3rBv2sM7CtCyaPavUP7QrhgsxJMdg/w
+99XZaeCAY00sLq8ApXZ13cAMd4VF5nRJpdeHQtKDcYxf02WrIlN4vcUusVfHAT/XJfX1pLAPZAN6
+8znu1sxJOZNFXhni5N14cvtEFEX+ntxk4mQZxXI09LZ/fV7/3f/72W1QbSL6Qa3QoALbnbLWh8GT
+J9v392rO20YAIf8n9O725y1XeENlZu2mC3skdF2L/ZWbXZCQsRtUQUU0EkpjBcVi6vWk4VL6qPrt
+k7Ycn+SKIV67psE3RL+3t7sSs79Pq84y6pzJKjzaumFYPSmAWm53TcNuTSPJ19xU5zBhuozBVhll
+LtTvMU9d6rzlqIy7Epf3gLIQGH/Pt60Y3rvzlBse3bsetVS49q+49hXJZwtUKfGB5y1PS9lnk6Lc
+a1OlMWOTxc602/DDm6vq+9kFJtHqKKpH0NrdBxHVvZLRsZR1Y7eRqTYZuqtC0UAwaNU7thbsVnUb
+fv99a8avba/FSGszaj+bx6qHX+PW6E238V2DhKb5W7GgPCF72GUbaDHLltIKTG1m/K//X/kwHsbD
+eBgP42E8jIfxML5s/Aebis1+ACgAAA==
+EOF
+
+RUN <<EOF
+    cat /entrypoint.64 | base64 -d | tar zxf - > /entrypoint.sh
+EOF
+
+# These are the default ports in use by GCSv5.4. Currently, they can not be changed.
+#   443 : HTTPD service for GCS Manager API and HTTPS access to collections
+#  50000-51000 : Default port range for incoming data transfer tasks
+EXPOSE 443/tcp 50000-51000/tcp
+
+# Default command unless overridden with 'docker run --entrypoint'
+ENTRYPOINT ["/entrypoint.sh"]
+# Default options to ENTRYPOINT unless overridden with 'docker run arg1...'
+CMD []

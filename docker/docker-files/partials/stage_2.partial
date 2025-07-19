@@ -17,13 +17,17 @@ RUN <<EOF
     cat /ansible.64 | base64 -d | (cd /; tar zxf -)
 EOF
 
-ARG GLOBUS_ANSIBLE_OPTIONS
-
 # Modifying this arg value on the build command line will cause RUN to reinstall
 # Globus instead of using the previous, cached iteration (if it exists). Useful
 # for speeding up re-runs to get newer Globus versions.
 ARG CACHEBUST=1
+ARG GCS_PROXY
+ARG GCS_REPO
 
 RUN <<EOF
-    (cd /ansible; /venv/bin/ansible-playbook playbook.yml ${GLOBUS_ANSIBLE_OPTIONS})
+    ANSIBLE_CMD="/venv/bin/ansible-playbook playbook.yml"
+    if [ -n "$GCS_REPO" ]; then ANSIBLE_CMD="${ANSIBLE_CMD} -e gcs_repo=${GCS_REPO}"; fi
+    # Pass on proxy support if requested. Used for the pre-stable repo
+    if [ -n "$GCS_PROXY" ]; then ANSIBLE_CMD="${ANSIBLE_CMD} -e gcs_proxy=${GCS_PROXY}"; fi
+    (cd /ansible; ${ANSIBLE_CMD})
 EOF

@@ -6,7 +6,7 @@
 # Ansible facts of interest:
 #
 #  ansible_os_family: RedHat | Springdale
-#  ansible_distribution_major_version: 8 | 9 | 40 | 41
+#  ansible_distribution_major_version: 8 | 9 | 10 | 41 | 42
 #  ansible_distribution: AlmaLinux | CentOS | Fedora | OracleLinux | RedHat | Rocky | Springdale
 #
 
@@ -37,6 +37,15 @@
   when:
     # Fedora 41+ comes with dnf5 and config-manager
     - ansible_distribution_major_version|int < 41
+
+- name: Install the GCS RPM repository key (Legacy)
+  become: yes
+  rpm_key:
+    key: https://downloads.globus.org/globus-connect-server/{{ _repo_infixes[gcs_repo] }}/installers/keys/GPG-KEY-Globus
+  when:
+    # Do not install on EL10+ or Fedora 42+
+    - ansible_distribution == "Fedora" or ansible_distribution_major_version|int < 10
+    - ansible_distribution != "Fedora" or ansible_distribution_major_version|int < 42
 
 - name: Install the GCS RPM repository key (2024)
   become: yes

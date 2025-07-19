@@ -3,7 +3,6 @@
 * Removed support for Fedora 40, Ubuntu 24.10
 * Added support for Debian 13, Fedora 42, AlmaLinux 10, CentOS 10, Oracle Linux 10,
   Red Hat 10, Rocky Linux 10, Ubuntu 25.04
-* Removed legacy GCS RPM key from ansible role
 * Removed base64-encoded partials from version control
 * Switched base image for Rocky Linux 8, 9
 

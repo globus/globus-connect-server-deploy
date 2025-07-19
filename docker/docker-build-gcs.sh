@@ -16,11 +16,28 @@ if [ ! -f docker-files/Dockerfile.$DISTRO ]; then
     (cd docker-files; make docker-files)
 fi
 
+docker_build_args=""
+
+# Environment variable that tells Ansible which GCS repository to use.
+# Values: stable | unstable | testing | pre-stable
+# Default: stable
+if [ -n "${GCS_REPO}" ]
+then
+    docker_build_args="${docker_build_args} --build-arg=GCS_REPO=${GCS_REPO}"
+fi
+
+# GCS_PROXY=HOST:PORT of socks5 PROXY
+# Typically used for the pre-stable repository for pre-release testing.
+if [ -n "${GCS_PROXY}" ]
+then
+    docker_build_args="${docker_build_args} --build-arg=GCS_PROXY=${GCS_PROXY}"
+fi
+
 UNVERSIONED_TAG="globus/globus-connect-server:${DISTRO}"
 docker build \
     --progress plain \
     --tag $UNVERSIONED_TAG \
-    --build-arg="GLOBUS_ANSIBLE_OPTIONS=${GLOBUS_ANSIBLE_OPTIONS}" \
+    ${docker_build_args} \
     --build-arg CACHEBUST=$(date +%s) \
     - < docker-files/Dockerfile.$DISTRO
 

@@ -14,11 +14,6 @@
 
 # Import the GLOBUS key explicitly because the Ansible zypper module doesn't auto-import
 # keys they way zypper will
-- name: Install the GCS RPM repository key (Legacy)
-  become: yes
-  rpm_key:
-    key: https://downloads.globus.org/globus-connect-server/stable/installers/keys/GPG-KEY-Globus
-
 - name: Install the GCS RPM repository key (2024)
   become: yes
   rpm_key:
@@ -68,7 +63,7 @@
       enabled=1
       priority=98
       gpgcheck=1
-      gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Globus
+      gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Globus-2024
   when:
     - gcs_repo == "pre-stable"
 

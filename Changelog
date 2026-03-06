@@ -1,3 +1,6 @@
+3.0.0: Fri Mar 6 3:40:00 PM CDT 2026
+* Added Terraform installation and management support
+
 2.15.0: Fri Jul 11 09:39:21 AM CDT 2025
 * Added Ansible variable 'gcs_version' to install a specific version of GCS
 * Removed support for Fedora 40, Ubuntu 24.10

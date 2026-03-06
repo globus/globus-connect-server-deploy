@@ -11,21 +11,22 @@
 #
 
 # Import the EPEL key explicitly because the Ansible yum module doesn't auto-import
-# keys they way yum/dnf will
+# keys the way yum/dnf will
 - name: Install the EPEL RPM repository key
   become: yes
   rpm_key:
-    key: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_distribution_major_version }}
+    key: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_facts['distribution_major_version'] }}
   when:
-    - ansible_distribution != "Fedora"
+    - ansible_facts['distribution'] != "Fedora"
+  debugger: on_failed
 
 - name: Install the EPEL repository
   become: yes
   yum:
-    name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_distribution_major_version }}.noarch.rpm
+    name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_facts['distribution_major_version'] }}.noarch.rpm
     state: present
   when:
-    - ansible_distribution != "Fedora"
+    - ansible_facts['distribution'] != "Fedora"
 
 # Expliclity install this even though it is a soft dependency on the EPEL repo rpm because
 # auto-installation of soft dependencies is configurable and some distros have it disabled.
@@ -36,16 +37,7 @@
     state: present
   when:
     # Fedora 41+ comes with dnf5 and config-manager
-    - ansible_distribution_major_version|int < 41
-
-- name: Install the GCS RPM repository key (Legacy)
-  become: yes
-  rpm_key:
-    key: https://downloads.globus.org/globus-connect-server/{{ _repo_infixes[gcs_repo] }}/installers/keys/GPG-KEY-Globus
-  when:
-    # Do not install on EL10+ or Fedora 42+
-    - ansible_distribution == "Fedora" or ansible_distribution_major_version|int < 10
-    - ansible_distribution != "Fedora" or ansible_distribution_major_version|int < 42
+    - ansible_facts['distribution_major_version']|int < 41
 
 - name: Install the GCS RPM repository key (2024)
   become: yes
@@ -66,7 +58,7 @@
     cmd: "{{ _cmd }}"
   vars:
     _cmd: |
-      {% if ansible_distribution_major_version|int < 41 %}
+      {% if ansible_facts['distribution_major_version']|int < 41 %}
         dnf config-manager --disable Globus-Connect-Server-5-Stable
       {% else %}
         dnf5 config-manager setopt Globus-Connect-Server-5-Stable.enabled=0
@@ -81,7 +73,7 @@
     cmd: "{{ _cmd }}"
   vars:
     _cmd: |
-      {% if ansible_distribution_major_version|int < 41 %}
+      {% if ansible_facts['distribution_major_version']|int < 41 %}
         dnf config-manager --enable Globus-Connect-Server-5-Testing
       {% else %}
         dnf5 config-manager setopt Globus-Connect-Server-5-Testing.enabled=1
@@ -96,7 +88,7 @@
     cmd: "{{ _cmd }}"
   vars:
     _cmd: |
-      {% if ansible_distribution_major_version|int < 41 %}
+      {% if ansible_facts['distribution_major_version']|int < 41 %}
         dnf config-manager --enable Globus-Connect-Server-5-Unstable
       {% else %}
         dnf5 config-manager setopt Globus-Connect-Server-5-Unstable.enabled=1
@@ -112,15 +104,14 @@
     content: |
       [Globus-Connect-Server-5-Pre-Stable]
       name=Globus Connect Server 5 Pre Stable
-      baseurl=https://builds.globus.org/downloads.globus.org/globus-connect-server/stable/rpm/{{ _dir }}/{{ ansible_distribution_major_version }}/$basearch/
+      baseurl=https://builds.globus.org/downloads.globus.org/globus-connect-server/stable/rpm/{{ _dir }}/{{ ansible_facts['distribution_major_version'] }}/$basearch/
       failovermethod=priority
       enabled=1
       priority=98
       gpgcheck=1
-      gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Globus
-             file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Globus-2024
+      gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Globus-2024
   vars:
-    _dir: "{{ 'fedora' if (ansible_distribution == 'Fedora') else 'el' }}"
+    _dir: "{{ 'fedora' if (ansible_facts['distribution'] == 'Fedora') else 'el' }}"
   when:
     - gcs_repo == "pre-stable"
 
@@ -134,18 +125,8 @@
     - gcs_repo == "pre-stable"
     - gcs_proxy is defined
 
-- name: Install Globus Connect Server (latest)
+- name: Install Globus Connect Server ({{ gcs_version | default('latest') }})
   become: yes
   yum:
-    name: globus-connect-server54
+    name: "{{ 'globus-connect-server54 = ' + gcs_version if gcs_version is defined else 'globus-connect-server54' }}"
     state: present
-  when:
-    - gcs_version is not defined
-
-- name: Install Globus Connect Server ({{ gcs_version }})
-  become: yes
-  yum:
-    name: globus-connect-server54 = {{ gcs_version }}
-    state: present
-  when:
-    - gcs_version is defined

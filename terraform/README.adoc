@@ -75,7 +75,7 @@ A GCS Subscription ID is needed that has the aforementioned client ID as a membe
 
 == Replacements
 
-Automatic node cleanup is not performed in this project. As a result, Terraform will perform a check to ensure that a `node cleanup` was ran by way of checking the EC2 tags.
+Automatic node cleanup is not performed in this project. As a result, Terraform will perform a check to ensure that a `node cleanup` was run by way of checking the EC2 tags.
 An alternative, which you can explore, is utilizing link:https://docs.globus.org/globus-connect-server/v5/reference/node/delete/[`node delete`] on any existing nodes after setting up the new node. However, in most cases `node cleanup` should be used as warned in the linked page.
 
 One example of running just a `node cleanup` is by way of the `cleanup-node` SSM Document. See the below example:

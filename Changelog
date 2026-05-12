@@ -1,3 +1,6 @@
+3.0.0: Fri Mar 6 3:40:00 PM CDT 2026
+* Added Terraform installation and management support
+
 2.16.0: Thu Mar  5 10:29:57 AM CST 2026
 * Removed Fedora 41, Ubuntu 20.04. Added Fedora 43, Ubuntu 25.10
 * Resolved Ansible deprecation warnings

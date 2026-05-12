@@ -9,6 +9,7 @@
     <li><a href="#about-the-project">About The Project</a></li>
     <li><a href="docker/">Docker Images</a></li>
     <li><a href="ansible/">Ansible Playbook</a></li>
+    <li><a href="terraform/">Terraform</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
     <li><a href="Changelog">Changelog</a></li>
@@ -16,7 +17,7 @@
 </details>
 
 ## About The Project
-This project provides tools that support the deployment of [Globus Connect Server](https://www.globus.org/globus-connect) using Ansible or Docker. It serves as a starting point for endpoint administrators interested in automated deployment for production or testing purposes. Ansible and Docker knowledge is assumed since the examples will most likely need to be adapted to fit your environment.
+This project provides tools that support the deployment of [Globus Connect Server](https://www.globus.org/globus-connect) using Ansible, Docker, or Terraform. It serves as a starting point for endpoint administrators interested in automated deployment for production or testing purposes. Knowledge of the tools is assumed since the examples will most likely need to be adapted to fit your environment.
 
 ## License
 All work is copyright the University of Chicago. All rights reserved.

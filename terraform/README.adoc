@@ -1,0 +1,150 @@
+= GCS Endpoints Managed with Terraform
+
+This project aims to demonstrate one possible way of utilizing Terraform in a Cloud Environment (in this case AWS) to manage and automate Globus Connect Server(s). 
+Terraform and Packer knowledge is assumed since the examples will need to be adapted to fit your environment.
+
+== Documentation
+.General documentation that maybe useful:
+. https://docs.globus.org/globus-connect-server/v5/
+. https://docs.globus.org/globus-connect-server/v5/automated-deployment
+
+== Workflow
+
+=== Synopsis
+AWS SSM Parameter Store contains the configuration data used by the scripts for automation. These scripts are housed inside of an EC2 AMI that is created via Packer.
+An AWS SSM Document runs the `deploy.sh` script upon instance creation allowing us to have a pipeline where we simply define the endpoint config and run terraform. This results in a provisioned GCS Endpoint on that spawned EC2 instance configured as per the endpoint config.
+
+[IMPORTANT]
+====
+For this simple demonstration, AWS SSM Parameters is used to store endpoint configuration. However, due to the limiting quotas for the parameter size, this can be outgrown quickly depending on
+the complexity of the configuratin and number of endpoints. Some alternatives you can explore are DocumentDB and S3.
+====
+
+==== Scripts
+.Each of the following scripts use shared functions and global environment variables defined in `lib.sh`.
+
+deploy.sh :: Runs all the scripts in the appropriate order for a full deployment
+endpoint-setup.sh :: Create the GCS Endpoint and set the SSM Parameters (endpoint ID, )
+node-setup.sh :: Set the instance as a Data Transfer Node (DTN) for the GCS Endpoint
+set-subscription.sh :: Sets the Subscription ID of the GCS Endpoint
+create-gateway.sh :: Creates the GCS Storage Gateway(s)
+create-collections.sh :: Creates the GCS Collection(s) on the associated Storage Gateway
+create-roles.sh :: Create any administrator, activity_manager, and activity_monitor 
+cleanup.sh :: Performs a node cleanup, followed by a endpoint cleanup, followed by cleaning up SSM Parameters (endpoint ID and deployment-key).
+
+== Additional Things to Explore
+Although this is kept quite simple, you may find insipiration to add additional functionality or features such as:
+
+- Supporting arguments for Collections
+- Additional tooling like creating Linux users which map to the identity
+- Update the AMI to install an identity mapping application for Storage Gateways to use
+- Add linux users if you wish to use the default identity option (see also the example identity-mapping.txt for more details)
+- Adding clustered Endpoints
+
+[NOTE]
+====
+.Accessing the Collection
+
+Before you can access the collection made by this project, you must first add the user portion of your email identity as a Linux user on the host.
+====
+
+== Prerequisites
+
+=== Workstation
+.Your workstation environment tooling/setup:
+. AWS session with admin privileges
+. Terraform installed
+. Packer installed
+
+=== AWS Bucket for State Backend
+The Terraform backend chosen is an AWS S3 Bucket. Creating it is out of scope of this document, but this bucket will need to be created and specified in the `state.tf` files.
+
+=== Client Identity
+The Client Identity is used to automate managing the created endpoints.
+
+.Create the Client Identity
+. Go to https://app.globus.org/settings/developers
+. Create a new project (optional)
+. Go to `Advanced registration` and provide an app name
+. Create the app
+. Click `Add Client Secret` and name the secret
+. Save the Secret Key and the Client UUID
+
+=== Subscription
+A GCS Subscription ID is needed that has the aforementioned client ID as a member.
+
+== Replacements
+
+Automatic node cleanup is not performed in this project. As a result, Terraform will perform a check to ensure that a `node cleanup` was run by way of checking the EC2 tags.
+An alternative, which you can explore, is utilizing link:https://docs.globus.org/globus-connect-server/v5/reference/node/delete/[`node delete`] on any existing nodes after setting up the new node. However, in most cases `node cleanup` should be used as warned in the linked page.
+
+One example of running just a `node cleanup` is by way of the `cleanup-node` SSM Document. See the below example:
+
+.While inside the `environment/` folder
+[source,bash]
+----
+# Obtain instance ID mapped to the endpoint
+% terraform console <<< '[for ec2 in aws_instance.this : { (ec2.tags["Name"]) = ec2.id } ]'
+[
+  {
+    "demo-ep1" = "i-014e03e9fa593cee1"
+  },
+]
+# Run the document
+% aws ssm send-command --document-name GCS-Terraform-Demo-20260209183305-cleanup-node --targets '[{"Key":"InstanceIds","Values":["i-014e03e9fa593cee1"]}]' --parameters '{"SSMID":["demo-ep1"]}''
+----
+
+Check the status of the command via `aws ssm get-command-invocation` or via the AWS Console in `SSM Manager > Run Command > Command History`.
+
+== Deploy
+_Assumes the prequisites are already met_
+
+*Anything that must be changed should be seen with `CHANGEME` as the value.*
+
+=== Configuration
+The `config/` directory is the central location for defining the configuration used throughout the project. Most importantly, in it is where the endpoint configuration(s) are defined.
+
+[NOTE]
+=====
+Sensitive data (e.g. Client Credentials) can be stored in `config_override.tf` which overrides whatever is in `config.tf`. This override file is ignored by git.
+=====
+
+.Terraform State
+Before we begin, we must configure the terraform state backend by editing the `state.tf` file to add the bucket name.
+
+.Changes
+While most of the configuration is defined with example data that is ready to go, there are some things that need to be updated:
+
+. `subscription_id`
+. `credential.id` and `credential.secret`
+. The `domain` for the gateway(s)
+
+.Apply the Terraform
+When ready, run `terraform apply`.
+
+=== Shared
+.Terraform State
+Before we begin, we must configure the terraform state backend by editing the `state.tf` file to add the bucket name.
+
+.Changes
+Update the `terraform_remote_state` resource with the bucket name that is used as the state backend.
+
+.Apply the Terraform
+When ready, run `terraform apply`.
+
+=== Packer
+.Changes
+Using the outputs from our apply in `shared/`, update the fields in the packer `build.pkr.hcl` file located under the `terraform` map in the `locals {}` block.
+
+.Apply the Terraform
+When ready, run `terraform apply`.
+
+=== Environment
+.Terraform State
+Before we begin, we must configure the terraform state backend by editing the `state.tf` file to add the bucket name.
+
+.Changes
+Update the `terraform_remote_state` resource with the bucket name that is used as the state backend.
+
+.Apply the Terraform
+When ready, run `terraform apply`.

@@ -1,0 +1,71 @@
+# Below is a commented example of an identity mapping necessary when a storage
+# gateway has more than a single allowed domain or the mapping between Globus
+# identities is more complicated than the default. Uncomment and tailor the
+# text below to fit your needs. If you wish to use the default identity mapping
+# provided by the storage gateway, you do not need to provide an identity
+# expression mapping here.
+#
+# All identity expression mappings include the DATA_TYPE field with 1 or more
+# entries in the mappings array. See the reference Globus identity strucuture
+# below for insight on which field values can be used in an expression mapping.
+#
+# Example 1:
+# In this example, identity mapping has 2 possibilities:
+#  1. If the `username` value of the Globus identity structure is in the format
+#     user@example.edu, the mapped local username will be `user`. Note that
+#     regular expression matching is used for this mapping.
+#  2. If the `id` value of the identity is a case-insensitive match with the
+#     UUID, the local username will be `foo`.
+#  3. If neither mapping matches the identity, the mapping fails and the user
+#     is denied access.
+#
+#   {
+#     "DATA_TYPE": "expression_identity_mapping#1.0.0",
+#     "mappings": [
+#       {
+#         "source": "{username}",
+#         "match": "(.*)@example\\.org",
+#         "output": "{0}"
+#       },
+#       {
+#         "source": "{id}",
+#         "match": "ce986100-ab06-4991-9fa8-5302d2215bee",
+#         "output": "foo",
+#         "ignore_case": true
+#       }
+#     ]
+#   }
+#
+# Example 2:
+# In this example, identity mapping has only a single possibility:
+#  1. If the `username` value is exactly `bar@example.org`, the local username
+#     will be `bar`. Note that `literal: true` turns off regular expression
+#     mapping so there is no need to use escapes in the value for `match`.
+#  2. Otherwise, the mapping fails and the user is denied access.
+#
+#   {
+#     "DATA_TYPE": "expression_identity_mapping#1.0.0",
+#     "mappings": [
+#       {
+#         "source": "{username}",
+#         "match": "bar@example.org",
+#         "output": "bar",
+#         "literal": true,
+#       },
+#     ]
+#   }
+#
+# For reference purposes, this is an example of the structure of a Globus
+# identity with fields and values that can be included in the mapping expression
+# above.
+#
+#    {
+#      "email": "user@example.org",
+#      "id": "ce986100-ab06-4991-9fa8-5302d2215bee",
+#      "identity_provider": "2eb7f0cf-5c3c-4073-9fc7-8b3df5f0389f",
+#      "identity_type": "login",
+#      "name": "Joe User",
+#      "organization": "Example Organization",
+#      "status": "used",
+#      "username": "user@example.org"
+#    }

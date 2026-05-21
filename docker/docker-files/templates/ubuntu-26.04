@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.3-labs
 
 ############## STAGE 1 - Prepare the image for GCS installation ################
-FROM ubuntu:25.04
+FROM ubuntu:26.04
 
 # Prereqs
 RUN <<EOF

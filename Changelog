@@ -1,3 +1,7 @@
+3.1.0: Thu May 21 10:48:08 AM CDT 2026
+- Added Docker support for Ubuntu 26.04 and Fedora 44
+- Removed Docker support for Ubuntu 25.04 and Fedora 42
+
 3.0.0: Fri Mar 6 3:40:00 PM CDT 2026
 * Added Terraform installation and management support
 

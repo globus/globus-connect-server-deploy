@@ -1,7 +1,6 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 set -e
-#set -x
 
 DISTRO=$1
 

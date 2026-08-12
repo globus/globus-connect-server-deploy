@@ -16,6 +16,8 @@
   apt:
     deb: https://downloads.globus.org/globus-connect-server/{{ _repo_infixes[gcs_repo] }}/installers/repo/deb/globus-repo_latest_all.deb
     state: present
+  when:
+    - gcs_repo != "pre-stable"
 
 - name: Enable the Globus Connect Server {{ gcs_repo }} repositories
   become: yes
@@ -35,15 +37,7 @@
     replace: '# deb '
   when:
     - gcs_repo != "stable"
-
-- name: Enable the Globus Connect Server pre-stable repository
-  become: yes
-  copy:
-    dest: /etc/apt/sources.list.d/globus-connect-server-pre-stable-{{ ansible_distribution_release }}.list
-    content: |
-      deb [signed-by=/usr/share/globus-repo/GPG-KEY-Globus-2024.gpg] https://builds.globus.org/downloads.globus.org/globus-connect-server/stable/deb {{ ansible_distribution_release }} contrib
-  when:
-    - gcs_repo == "pre-stable"
+    - gcs_repo != "pre-stable"
 
 - name: Enable the Globus Connect Server pre-stable proxy
   become: yes
@@ -54,6 +48,41 @@
   when:
     - gcs_repo == "pre-stable"
     - gcs_proxy is defined
+
+# This will install the latest/pre-release keys and repo definitions.
+# The apt module downloads deb URLs via Python urllib, which does not understand
+# the socks5h:// proxy scheme and would silently bypass the proxy.  When a proxy
+# is configured we use a stdlib-only Python SOCKS5 downloader (no extra packages
+# needed); without a proxy the apt module can handle the URL directly.
+- name: Download the GCS repository definitions (pre-stable, via SOCKS5 proxy)
+  script:
+    cmd: >-
+      socks5_download.py {{ gcs_proxy }}
+      https://builds.globus.org/downloads.globus.org/globus-connect-server/stable/installers/repo/deb/globus-repo_latest_all.deb
+      /tmp/globus-repo_latest_all.deb
+    executable: python3
+  when:
+    - gcs_repo == "pre-stable"
+    - gcs_proxy is defined
+
+- name: Install the GCS repository definitions (pre-stable)
+  become: yes
+  apt:
+    deb: >-
+      {{ '/tmp/globus-repo_latest_all.deb' if gcs_proxy is defined
+         else 'https://builds.globus.org/downloads.globus.org/globus-connect-server/stable/installers/repo/deb/globus-repo_latest_all.deb' }}
+    state: present
+  when:
+    - gcs_repo == "pre-stable"
+
+- name: Enable the Globus Connect Server pre-stable repository
+  become: yes
+  copy:
+    dest: /etc/apt/sources.list.d/globus-connect-server-pre-stable-{{ ansible_distribution_release }}.list
+    content: |
+      deb [signed-by=/usr/share/globus-repo/GPG-KEY-Globus-2024.gpg] https://builds.globus.org/downloads.globus.org/globus-connect-server/stable/deb {{ ansible_distribution_release }} contrib
+  when:
+    - gcs_repo == "pre-stable"
 
 - name: Update the APT cache
   become: yes

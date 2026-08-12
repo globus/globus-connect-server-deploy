@@ -67,11 +67,19 @@
   when:
     - gcs_repo == "pre-stable"
 
+- name: Enable the Globus Connect Server pre-stable proxy
+  become: yes
+  lineinfile:
+    path: /etc/zypp/repos.d/globus-connect-server-5-pre-stable.repo
+    line: proxy=socks5h://{{ gcs_proxy }}
+    insertafter: EOF
+  when:
+    - gcs_repo == "pre-stable"
+    - gcs_proxy is defined
+
 - name: Install Globus Connect Server
   become: yes
   zypper:
     name: globus-connect-server54
     state: present
-  environment:
-    HTTPS_PROXY: "{{'socks5h://{{ gcs_proxy }}' if (gcs_proxy is defined) else '' }}"
 

@@ -1,34 +1,35 @@
-FROM almalinux:10
+FROM opensuse/leap:16.0
 # ── Prerequisites ─────────────────────────────────────────────────────────────
-RUN dnf install -y epel-release \
- && dnf clean all
+RUN zypper install -y curl \
+ && zypper clean -a
 
 # ── Globus repository ─────────────────────────────────────────────────────────
-RUN dnf install -y \
-        https://downloads.globus.org/globus-connect-server/stable/installers/repo/rpm/globus-repo-latest.noarch.rpm \
- && dnf clean all
+RUN curl -LOs https://downloads.globus.org/globus-connect-server/stable/installers/repo/rpm/globus-repo-latest.noarch.rpm \
+ && rpm -i globus-repo-latest.noarch.rpm \
+ && rm globus-repo-latest.noarch.rpm \
+ && zypper --gpg-auto-import-keys refresh
 # ── systemctl mock prerequisites ───────────────────────────────────────────────
-# Install python3 and systemd now, at the current repo version, before the
-# excludepkgs lock below prevents further updates.  GCS depends on systemd;
-# without an explicit install here, dnf could pull in a newer version during
-# the GCS install step and overwrite /bin/systemctl.
-RUN dnf install -y python3 systemd \
- && dnf clean all
+# Install python311 and systemd now, at the current repo version, before the
+# zypper addlock below prevents further updates.  python311 does not create
+# /usr/bin/python3 automatically on SUSE 15; the symlink is added below.
+RUN zypper install -y python311 systemd \
+ && ln -sf /usr/bin/python3.11 /usr/bin/python3 \
+ && zypper clean -a
 
 # ── Protect /bin/systemctl from package updates ────────────────────────────────
-# Prevent dnf from updating the systemd package so that installing GCS cannot
+# Prevent zypper from updating the systemd package so that installing GCS cannot
 # overwrite our mock symlink at /bin/systemctl.
-RUN echo "excludepkgs=systemd" >> /etc/dnf/dnf.conf
+RUN zypper addlock systemd
 
 # ── Install systemctl mock ─────────────────────────────────────────────────────
 # Must be in place before GCS so the mock intercepts %post scriptlet calls.
-# The excludepkgs lock above ensures dnf cannot overwrite /bin/systemctl.
+# The zypper addlock above ensures zypper cannot overwrite /bin/systemctl.
 COPY systemctl/systemctl_mock.py /gcs-deploy/systemctl-mock
 RUN chmod +x /gcs-deploy/systemctl-mock \
  && ln -sf /gcs-deploy/systemctl-mock /bin/systemctl
 # ── Install GCS ───────────────────────────────────────────────────────────────
-RUN dnf install -y globus-connect-server54 \
- && dnf clean all
+RUN zypper install -y globus-connect-server54 \
+ && zypper clean -a
 # ── GCS deployment files ───────────────────────────────────────────────────────
 COPY entrypoint/ /gcs-deploy/
 RUN chmod +x /gcs-deploy/entrypoint.sh \

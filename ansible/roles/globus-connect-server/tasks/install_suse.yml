@@ -7,13 +7,12 @@
 #
 #  ansible_os_family: Suse
 #  ansible_distribution_major_version: 15
-#  ansible_distribution_release": 4
-#  ansible_distribution_version": 15.4
-#  ansible_distribution: openSUSE Leap
+#  ansible_distribution_version: 15.6
+#  ansible_distribution: openSUSE Leap | SLES
 #
 
-# Import the GLOBUS key explicitly because the Ansible zypper module doesn't auto-import
-# keys they way zypper will
+# Import the Globus key explicitly because the Ansible zypper module doesn't
+# auto-import keys the way zypper will.
 - name: Install the GCS RPM repository key (2024)
   become: yes
   rpm_key:
@@ -22,64 +21,11 @@
 - name: Install the GCS repository definitions
   become: yes
   zypper:
-    name: https://downloads.globus.org/globus-connect-server/{{ _repo_infixes[gcs_repo] }}/installers/repo/rpm/globus-repo-latest.noarch.rpm
+    name: https://downloads.globus.org/globus-connect-server/stable/installers/repo/rpm/globus-repo-latest.noarch.rpm
     state: present
-  when:
-    - gcs_repo != "pre-stable"
-
-- name: Disable the Globus Connect Server stable repositories
-  become: yes
-  ansible.builtin.shell:
-    cmd: "zypper modifyrepo --disable Globus-Connect-Server-5-Stable"
-  when:
-    - gcs_repo != "stable"
-    - gcs_repo != "pre-stable"
-
-- name: Enable the Globus Connect Server testing repositories
-  become: yes
-  ansible.builtin.shell:
-    cmd: "zypper modifyrepo --enable Globus-Connect-Server-5-Testing"
-  when:
-    - gcs_repo == "testing"
-    - gcs_repo != "pre-stable"
-
-- name: Enable the Globus Connect Server unstable repositories
-  become: yes
-  ansible.builtin.shell:
-    cmd: "zypper modifyrepo --enable Globus-Connect-Server-5-Unstable"
-  when:
-    - gcs_repo == "unstable"
-    - gcs_repo != "pre-stable"
-
-- name: Enable the Globus Connect Server pre-stable repositories
-  become: yes
-  copy:
-    dest: /etc/zypp/repos.d/globus-connect-server-5-pre-stable.repo
-    content: |
-      [Globus-Connect-Server-5-Pre-Stable]
-      name=Globus Connect Server 5 Pre Stable
-      baseurl=https://builds.globus.org/downloads.globus.org/globus-connect-server/stable/rpm/suse/{{ ansible_distribution_version }}/$basearch/
-      failovermethod=priority
-      enabled=1
-      priority=98
-      gpgcheck=1
-      gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Globus-2024
-  when:
-    - gcs_repo == "pre-stable"
-
-- name: Enable the Globus Connect Server pre-stable proxy
-  become: yes
-  lineinfile:
-    path: /etc/zypp/repos.d/globus-connect-server-5-pre-stable.repo
-    line: proxy=socks5h://{{ gcs_proxy }}
-    insertafter: EOF
-  when:
-    - gcs_repo == "pre-stable"
-    - gcs_proxy is defined
 
 - name: Install Globus Connect Server
   become: yes
   zypper:
     name: globus-connect-server54
     state: present
-

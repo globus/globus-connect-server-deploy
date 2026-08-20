@@ -6,19 +6,18 @@
 # Ansible facts of interest:
 #
 #  ansible_os_family: RedHat | Springdale
-#  ansible_distribution_major_version: 8 | 9 | 10 | 41 | 42
+#  ansible_distribution_major_version: 8 | 9 | 10 | 43 | 44
 #  ansible_distribution: AlmaLinux | CentOS | Fedora | OracleLinux | RedHat | Rocky | Springdale
 #
 
 # Import the EPEL key explicitly because the Ansible yum module doesn't auto-import
-# keys the way yum/dnf will
+# keys the way yum/dnf will.
 - name: Install the EPEL RPM repository key
   become: yes
   rpm_key:
     key: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_facts['distribution_major_version'] }}
   when:
     - ansible_facts['distribution'] != "Fedora"
-  debugger: on_failed
 
 - name: Install the EPEL repository
   become: yes
@@ -28,7 +27,7 @@
   when:
     - ansible_facts['distribution'] != "Fedora"
 
-# Expliclity install this even though it is a soft dependency on the EPEL repo rpm because
+# Explicitly install this even though it is a soft dependency on the EPEL repo rpm because
 # auto-installation of soft dependencies is configurable and some distros have it disabled.
 - name: Install dnf config-manager
   become: yes
@@ -42,88 +41,13 @@
 - name: Install the GCS RPM repository key (2024)
   become: yes
   rpm_key:
-    key: https://downloads.globus.org/globus-connect-server/{{ _repo_infixes[gcs_repo] }}/installers/keys/GPG-KEY-Globus-2024
+    key: https://downloads.globus.org/globus-connect-server/stable/installers/keys/GPG-KEY-Globus-2024
 
 - name: Install the GCS repository definitions
   become: yes
   yum:
-    name: https://downloads.globus.org/globus-connect-server/{{ _repo_infixes[gcs_repo] }}/installers/repo/rpm/globus-repo-latest.noarch.rpm
+    name: https://downloads.globus.org/globus-connect-server/stable/installers/repo/rpm/globus-repo-latest.noarch.rpm
     state: present
-  when:
-    - gcs_repo != "pre-stable"
-
-- name: Disable the Globus Connect Server stable repositories
-  become: yes
-  ansible.builtin.shell:
-    cmd: "{{ _cmd }}"
-  vars:
-    _cmd: |
-      {% if ansible_facts['distribution_major_version']|int < 41 %}
-        dnf config-manager --disable Globus-Connect-Server-5-Stable
-      {% else %}
-        dnf5 config-manager setopt Globus-Connect-Server-5-Stable.enabled=0
-      {% endif %}
-  when:
-    - gcs_repo != "stable"
-    - gcs_repo != "pre-stable"
-
-- name: Enable the Globus Connect Server testing repositories
-  become: yes
-  ansible.builtin.shell:
-    cmd: "{{ _cmd }}"
-  vars:
-    _cmd: |
-      {% if ansible_facts['distribution_major_version']|int < 41 %}
-        dnf config-manager --enable Globus-Connect-Server-5-Testing
-      {% else %}
-        dnf5 config-manager setopt Globus-Connect-Server-5-Testing.enabled=1
-      {% endif %}
-  when:
-    - gcs_repo == "testing"
-    - gcs_repo != "pre-stable"
-
-- name: Enable the Globus Connect Server unstable repositories
-  become: yes
-  ansible.builtin.shell:
-    cmd: "{{ _cmd }}"
-  vars:
-    _cmd: |
-      {% if ansible_facts['distribution_major_version']|int < 41 %}
-        dnf config-manager --enable Globus-Connect-Server-5-Unstable
-      {% else %}
-        dnf5 config-manager setopt Globus-Connect-Server-5-Unstable.enabled=1
-      {% endif %}
-  when:
-    - gcs_repo == "unstable"
-    - gcs_repo != "pre-stable"
-
-- name: Enable the Globus Connect Server pre-stable repositories
-  become: yes
-  copy:
-    dest: /etc/yum.repos.d/globus-connect-server-5-pre-stable.repo
-    content: |
-      [Globus-Connect-Server-5-Pre-Stable]
-      name=Globus Connect Server 5 Pre Stable
-      baseurl=https://builds.globus.org/downloads.globus.org/globus-connect-server/stable/rpm/{{ _dir }}/{{ ansible_facts['distribution_major_version'] }}/$basearch/
-      failovermethod=priority
-      enabled=1
-      priority=98
-      gpgcheck=1
-      gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Globus-2024
-  vars:
-    _dir: "{{ 'fedora' if (ansible_facts['distribution'] == 'Fedora') else 'el' }}"
-  when:
-    - gcs_repo == "pre-stable"
-
-- name: Enable the Globus Connect Server pre-stable proxy
-  become: yes
-  lineinfile:
-    path: /etc/yum.repos.d/globus-connect-server-5-pre-stable.repo
-    line: proxy=socks5h://{{ gcs_proxy }}
-    insertafter: EOF
-  when:
-    - gcs_repo == "pre-stable"
-    - gcs_proxy is defined
 
 - name: Install Globus Connect Server ({{ gcs_version | default('latest') }})
   become: yes

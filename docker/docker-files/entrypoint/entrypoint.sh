@@ -6,11 +6,11 @@
 # starts all GCS services via the systemctl mock), then monitors those services
 # until the container receives SIGTERM.
 #
-# Required environment variables:
-#   DEPLOYMENT_KEY        — JSON content of the endpoint deployment key
+# Required — bind-mount the endpoint deployment key into the container:
+#   docker run -v /path/to/deployment-key.json:/deployment-key.json:ro ...
 #
 # Optional environment variables:
-#   NODE_SETUP_ARGS       — extra arguments passed to 'node setup'
+#   NODE_SETUP_ARGS        — extra arguments passed to 'node setup'
 #   GLOBUS_SDK_ENVIRONMENT — target a non-production Globus environment
 
 # ── Capability check ──────────────────────────────────────────────────────────
@@ -22,21 +22,19 @@
 
 systemctl check-capabilities || exit 1
 
-# ── Required environment variables ───────────────────────────────────────────
-
-if [ -z "${DEPLOYMENT_KEY}" ]; then
-    echo "Error: required environment variable DEPLOYMENT_KEY is not set" >&2
-    exit 1
-fi
-
 # ── Deployment key ────────────────────────────────────────────────────────────
 #
-# node setup expects the deployment key in a file.  Write the env var content
-# to a temporary location and restrict access to root only.
+# The deployment key must be bind-mounted into the container at a well-known
+# path.  Using a bind mount rather than an environment variable keeps the key
+# contents out of 'ps' output on the host.
 
-deployment_key=/run/deployment-key.json
-echo "$DEPLOYMENT_KEY" > "$deployment_key"
-chmod 600 "$deployment_key"
+deployment_key=/deployment-key.json
+
+if [ ! -f "$deployment_key" ]; then
+    echo "Error: deployment key not found at ${deployment_key}" >&2
+    echo "       Mount it with: docker run -v /path/to/deployment-key.json:${deployment_key}:ro ..." >&2
+    exit 1
+fi
 
 # ── Node setup ────────────────────────────────────────────────────────────────
 #

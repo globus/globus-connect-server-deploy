@@ -31,9 +31,10 @@ RUN chmod +x /gcs-deploy/systemctl-mock \
 RUN zypper install -y globus-connect-server54 \
  && zypper clean -a
 # ── GCS deployment files ───────────────────────────────────────────────────────
-COPY entrypoint/ /gcs-deploy/
+COPY entrypoint/entrypoint.sh /gcs-deploy/entrypoint.sh
+COPY entrypoint/gcs_manager.service.d/ /gcs-deploy/gcs_manager.service.d/
+COPY entrypoint/globus-oidc.service.d/ /gcs-deploy/globus-oidc.service.d/
 RUN chmod +x /gcs-deploy/entrypoint.sh \
-             /gcs-deploy/entrypoint-dev.sh \
  && mkdir -p /etc/systemd/system \
  && ln -sf /gcs-deploy/gcs_manager.service.d \
            /etc/systemd/system/gcs_manager.service.d \

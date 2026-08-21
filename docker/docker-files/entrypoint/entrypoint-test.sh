@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# GCS dev container entrypoint.
+# GCS test container entrypoint.
 #
 # Starts a container with the systemctl mock in place but without running
 # GCS node setup.  Use 'docker exec -it <container> bash' to connect and
@@ -9,7 +9,7 @@
 # This entrypoint is intentional — it is not a fallback for a misconfigured
 # production container.  To run a production GCS container use entrypoint.sh.
 
-echo "GCS dev container ready."
+echo "GCS test container ready."
 echo "Connect with:  docker exec -it $(hostname) bash"
 
 exec sleep infinity

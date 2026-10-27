@@ -2,5 +2,8 @@ venv/
 __pycache__/
 .ruff_cache/
 
+# Per-image build logs from scripts/build
+build-logs/
+
 # Editor swap files
 *.swp

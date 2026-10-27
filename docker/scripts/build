@@ -1,0 +1,669 @@
+#!/usr/bin/env bash
+############################################################################
+# build - build GCS images and verify them
+#
+# The engine behind 'make images'.  For each target it runs 'docker build', names
+# the image after the GCS version inside it and, unless --no-check, runs
+# scripts/smoke.sh in the image to check it.  Builds run in parallel.
+#
+# A build passes when docker build succeeds and smoke.sh finds the image correct.
+# The build log is only scanned for notes (see NOTES below).
+############################################################################
+#
+# Usage: scripts/build [options] <target>...
+#
+#   <target>  distro                       rockylinux-9              (repo=stable)
+#             distro:repo                  rockylinux-9:pre-stable
+#
+# A repo is stable, unstable, testing, pre-stable, pre-unstable or pre-testing.
+# The pre- ones are internal (they need the VPN).
+#
+# Selection:
+#   --all                every supported distro
+#   --repo <repo>        repo for bare-distro targets            [stable]
+#   --repo-conf <repo>   where the globus-repo package comes from, for every
+#                        target: any repo above                  [the target's repo]
+#                        Use pre-stable for a distro whose definitions are only
+#                        there; the packages still come from the target's repo.
+#
+# Behaviour:
+#   -j <n>               concurrent builds                       [4]
+#   --no-check           build only; skip the runtime checks
+#   --refresh-base       --pull plus _BASE_CACHEBUST: new base image AND new
+#                        distro packages
+#   --no-cache           ignore the cache entirely (slow; --refresh-base is
+#                        almost always what you want instead)
+#   --gcs-version <v>    install exactly this GCS version (5.4.99, 5.4.100-rc1)
+#                        instead of the newest in the repo.
+#   --expect-gcs-version <v>
+#                        a build whose image does not contain exactly this GCS
+#                        version, as 'globus-connect-server --version' prints it,
+#                        fails.  Defaults to --gcs-version.  Without either, the
+#                        report only warns: when the images differ from each other,
+#                        or from the newest version the repo publishes.
+#   --build-arg <k=v>    passed through to docker build (repeatable)
+#   --proxy <url>        reach the network through a proxy, e.g. a SOCKS5 proxy
+#                        to a VPN: socks5h://127.0.0.1:1080.  Builds run with
+#                        --network=host (so the proxy can be on this machine's
+#                        loopback) and get the proxy as Docker's proxy build
+#                        args (ALL_PROXY, HTTP_PROXY, HTTPS_PROXY, and the
+#                        lower-case forms).  Use socks5h:// so DNS goes through the proxy.
+#                        All package downloads in the build use it, not only
+#                        the Globus hosts.  Base images are pulled by the Docker
+#                        daemon and are not affected.
+#   --log-dir <dir>      where to write logs                     [build-logs]
+#   --label <name>       subdirectory under --log-dir             [run]
+#
+# Image names:
+#   gcs-deploy/<distro>:<version>-<repo>   e.g. gcs-deploy/ubuntu-26.04:5.4.98-pre-stable
+#   gcs-deploy/<distro>:<repo>             the latest build of that repo
+# A pre-release keeps its tag: 5.4.100-rc1 is gcs-deploy/<distro>:5.4.100-rc1-unstable.
+# Every image has the labels gcs-deploy=1, gcs-deploy.distro, .repo, .version and,
+# when --repo-conf is given, .repo-conf.
+#
+# Images and logs are never removed here; 'make clobber' deletes the images and
+# 'make clean' the logs.  Progress: a line as each build starts and finishes, and
+# on a terminal a live line with the builds in flight.
+#
+# Without a working Docker daemon this fails.  (scripts/check-syntax skips with a
+# warning instead, but here a build was asked for and skipping would misreport.)
+############################################################################
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GCS_DOCKER="${SCRIPT_DIR}/.."
+DOCKERFILES="${GCS_DOCKER}/docker-files"
+SMOKE="${SCRIPT_DIR}/smoke.sh"
+IMAGE_PREFIX=gcs-deploy
+
+# shellcheck source=scripts/lib.sh
+. "${SCRIPT_DIR}/lib.sh"
+
+############################################################################
+# NOTES: what the build logs say that is worth acting on
+#
+# The build log is not part of the verdict: a failed download already fails the
+# build, and tools retry and recover from the rest.  It is still worth reading
+# for problems that fail nothing yet but will need attention: a signing key that
+# has expired, a deprecated feature, a package step that quietly failed.  Each
+# pattern below becomes a note in the report at the end.  Notes never change a
+# result.
+#
+# To add one, call _note_def with a label, an extended regex and what to do about
+# it.  The regex is matched against the whole log, with no '^' anchors, because
+# --progress=plain starts every line with a '#<step> <elapsed>' marker.  Keep
+# patterns narrow: a note that appears on every build gets ignored.
+#
+# Notices are the other source: a Dockerfile step that does something a reader of
+# the results should know (say, taking a package from another distro's repo)
+# prints 'GCS-DEPLOY-NOTICE: <text>', and the report repeats the text.  The
+# wording lives in the Dockerfile, next to the step it describes.
+############################################################################
+NOTE_LABEL=(); NOTE_RE=(); NOTE_WHY=()
+_note_def() { NOTE_LABEL+=("$1"); NOTE_RE+=("$2"); NOTE_WHY+=("$3"); }
+
+_note_def 'expired signing key' \
+  '\(EXPIRED\)|gpg key.*has expired' \
+  'A repo signing key has expired.  If the repo is a distro'\''s own, its vendor must publish a new one; a repo this build only borrows from is described by a notice above.'
+_note_def 'signature or key problem' \
+  'NO_PUBKEY|GPG error|is not signed|Signature verification failed' \
+  'A repo or package could not be verified; the builds may be skipping a check.'
+_note_def 'repo index out of sync' \
+  'Mirror sync in progress|unexpected size|Hash Sum mismatch' \
+  'A repo is mid-publish or inconsistent; rerun later, or tell whoever runs it.'
+_note_def 'SELinux policy module failed' \
+  'semodule: +Failed|Failed to resolve roletype|Failed to resolve AST' \
+  'GCS'\''s SELinux module failed to install.  In a container this has been the policy flavor (minimum, not targeted) or the policy installed in an earlier layer than GCS; see grep -n selinux-policy-targeted docker-files/Dockerfile.*.'
+_note_def 'package scriptlet failed' \
+  '[Ss]criptlet fail|Non-fatal' \
+  'A package install step failed but did not stop the install.'
+_note_def 'python traceback' \
+  'Traceback \(most recent call last\)' \
+  'A script crashed during the build.'
+_note_def 'deprecation' \
+  '(is|are|been) deprecated|DeprecationWarning|DEPRECATION' \
+  'Something the build uses is going away.'
+_note_def 'end of life' \
+  'end[- ]of[- ]life|no longer (supported|maintained)|reached EOL' \
+  'A distro or repo is out of support.'
+
+# _scan_notes <log> <outfile> - write one tab-separated line per pattern that
+# matches: label, number of matching lines, and the first matching line.
+_scan_notes() {
+  local i n first
+  : > "$2"
+  for i in "${!NOTE_RE[@]}"; do
+    n=$(grep -cE -- "${NOTE_RE[$i]}" "$1" || true)
+    (( n > 0 )) || continue
+    first=$(grep -m1 -E -- "${NOTE_RE[$i]}" "$1" | sed -E 's/^#[0-9]+ [0-9.]+ +//' | cut -c1-150)
+    printf '%s\t%s\t%s\n' "${NOTE_LABEL[$i]}" "$n" "$first" >> "$2"
+  done
+  # Notices come from the Dockerfile's own output lines, not the step's echoed command.
+  grep -E '^#[0-9]+ [0-9.]+ +GCS-DEPLOY-NOTICE: ' "$1" \
+    | sed -E 's/^#[0-9]+ [0-9.]+ +GCS-DEPLOY-NOTICE: //' | sort -u \
+    | while IFS= read -r msg; do printf 'notice\t1\t%s\n' "$msg"; done >> "$2" || true
+  return 0
+}
+
+############################################################################
+# OPTIONS
+#
+# Defaults, then the command line.  A target is a distro with an optional repo
+# (distro[:repo]); --all adds every distro.
+############################################################################
+JOBS=4
+DO_CHECK=1
+REFRESH_BASE=0
+NO_CACHE=0
+DEF_REPO=stable
+REPO_CONF=''
+EXPECT_GCS_VERSION=''
+PIN_GCS_VERSION=''
+LOG_DIR="${GCS_DOCKER}/build-logs"
+RUN_LABEL=run
+EXTRA_BUILD_ARGS=()
+PROXY_URL=''
+SPECS=()
+
+# usage - print the header comment from its Usage line to the closing rule.
+usage() {
+  sed -n '/^# Usage:/,/^####/p' "$0" | sed '$d; s/^# \?//' >&2
+}
+
+# _add_distro <distro> [<repo>] - queue a target.  A repo that was not given
+# stays empty and is filled in once all the options are read, so --repo applies
+# to bare targets whatever order the options appear in.
+_add_distro() {
+  distro_family "$1" >/dev/null || exit 1
+  SPECS+=("distro|${1}|${2:-}")
+}
+
+# _need "$@" - exit unless the option in $1 has a value after it.
+_need() {
+  [[ $# -ge 2 ]] && return 0
+  printf 'scripts/build: %s needs a value\n' "$1" >&2
+  exit 2
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --all)
+      for d in "${DISTROS[@]}"; do _add_distro "$d"; done ;;
+    --repo)   _need "$@"; DEF_REPO="$2"; shift ;;
+    --repo-conf) _need "$@"; REPO_CONF="$2"; shift ;;
+    -j)       _need "$@"; JOBS="$2"; shift ;;
+    -j*)      JOBS="${1#-j}" ;;
+    --no-check)     DO_CHECK=0 ;;
+    --refresh-base) REFRESH_BASE=1 ;;
+    --no-cache)     NO_CACHE=1 ;;
+    --expect-gcs-version) _need "$@"; EXPECT_GCS_VERSION="$2"; shift ;;
+    --gcs-version)    _need "$@"; PIN_GCS_VERSION="$2"; shift ;;
+    --build-arg)      _need "$@"; EXTRA_BUILD_ARGS+=(--build-arg "$2"); shift ;;
+    --proxy)          _need "$@"; PROXY_URL="$2"; shift ;;
+    --log-dir)        _need "$@"; LOG_DIR="$2"; shift ;;
+    --label)          _need "$@"; RUN_LABEL="$2"; shift ;;
+    -v|--verbose)     ;;   # accepted and ignored: build always prints a table
+    -h|--help)        usage; exit 0 ;;
+    -*) printf 'scripts/build: unknown option: %s\n' "$1" >&2; exit 1 ;;
+    *)
+      IFS=: read -r _d _r <<< "$1"
+      _add_distro "$_d" "${_r:-}" ;;
+  esac
+  shift
+done
+
+for _i in "${!SPECS[@]}"; do
+  IFS='|' read -r _k _d _r <<< "${SPECS[$_i]}"
+  SPECS[_i]="${_k}|${_d}|${_r:-$DEF_REPO}"
+done
+
+# The same target twice (say, --all and a distro) would run two builds into the
+# same log and tags; keep the first.
+_uniq=()
+for _s in "${SPECS[@]}"; do
+  [[ " ${_uniq[*]-} " == *" $_s "* ]] || _uniq+=("$_s")
+done
+SPECS=(${_uniq[@]+"${_uniq[@]}"})
+
+if [[ ! "$JOBS" =~ ^[1-9][0-9]*$ ]]; then
+  printf "scripts/build: -j needs a positive number, not '%s'\n" "$JOBS" >&2
+  exit 2
+fi
+
+# The versions are as 'globus-connect-server --version' prints them.  The pattern
+# is the one the image check applies to what it reads back (see _build_one).
+GCS_VERSION_RE='^[0-9]+\.[0-9]+\.[0-9]+([~.+-]?[A-Za-z]+[0-9]*)?$'
+for _v in "$PIN_GCS_VERSION" "$EXPECT_GCS_VERSION"; do
+  if [[ -n "$_v" && ! "$_v" =~ $GCS_VERSION_RE ]]; then
+    printf "scripts/build: '%s' is not a GCS version (5.4.99, 5.4.100-rc1)\n" "$_v" >&2
+    exit 2
+  fi
+done
+# '~' is accepted as the packages spell a pre-release, but --version prints
+# '-', and every comparison here is with what --version printed.
+PIN_GCS_VERSION="${PIN_GCS_VERSION//\~/-}"
+EXPECT_GCS_VERSION="${EXPECT_GCS_VERSION//\~/-}"
+# A pinned version is also the one the image must contain.
+EXPECT_GCS_VERSION="${EXPECT_GCS_VERSION:-$PIN_GCS_VERSION}"
+
+if [[ ${#SPECS[@]} -eq 0 ]]; then
+  printf 'scripts/build: no targets given\n\n' >&2
+  usage
+  exit 2
+fi
+
+# _check_repo <what> <repo> - exit unless the repo is one of REPOS.  Without it
+# a typo fails only when docker build cannot find the stage, a long way in.
+_check_repo() {
+  case " ${REPOS[*]} " in *" $2 "*) return 0 ;; esac
+  printf 'scripts/build: %s: unknown repo "%s" (one of: %s)\n' "$1" "$2" "${REPOS[*]}" >&2
+  exit 2
+}
+for _s in "${SPECS[@]}"; do
+  IFS='|' read -r _k _d _r <<< "$_s"
+  _check_repo "target ${_d}:${_r}" "$_r"
+done
+[[ -n "$REPO_CONF" ]] && _check_repo "--repo-conf" "$REPO_CONF"
+
+############################################################################
+# PREFLIGHT
+#
+# Fail early on what would waste a long run.
+############################################################################
+if ! docker info >/dev/null 2>&1; then
+  printf '%sDocker is not available or not usable by the current user.%s\n' "$RED" "$RST" >&2
+  printf 'scripts/build needs a working daemon; it will not skip silently.\n' >&2
+  exit 1
+fi
+
+# The pre- repos are on an internal host behind the VPN, and so is a pre-
+# --repo-conf.  Learning that after twenty minutes of builds is worse than a
+# two-second check now.
+if printf '%s\n' "${SPECS[@]}" | grep -q '|pre-' || [[ "$REPO_CONF" == pre-* ]]; then
+  if command -v curl >/dev/null 2>&1; then
+    if ! curl -fsS --max-time 10 ${PROXY_URL:+--proxy "$PROXY_URL"} -o /dev/null "https://builds.globus.org/" 2>/dev/null; then
+      printf '%sCannot reach builds.globus.org%s — are you on the VPN%s?\n' "$RED" "$RST" \
+        "${PROXY_URL:+ (checked through the proxy ${PROXY_URL})}" >&2
+      exit 1
+    fi
+  else
+    printf '⚠️  curl not found — skipping the builds.globus.org reachability check\n' >&2
+  fi
+fi
+
+# A hung container would otherwise stall the whole run.  'timeout' is GNU
+# coreutils and not everywhere, so go without it rather than fail.
+TIMEOUT=''
+command -v timeout >/dev/null 2>&1 && TIMEOUT='timeout 180'
+
+# A new value for every run, so the cache barrier in the Dockerfiles always fires.
+CACHEBUST_VALUE="$(date +%s)"
+RUNDIR="${LOG_DIR}/${RUN_LABEL}"
+rm -rf "$RUNDIR"
+mkdir -p "$RUNDIR"
+
+############################################################################
+# PER-IMAGE WORKER
+#
+# One image: build it, name it, scan its log, check it.  It runs as a background
+# job and records everything in files under $RUNDIR/<distro>-<repo>/
+# (build.log, status, failures, notes, version, image, smoke.out).  It always
+# exits 0: the parent decides pass or fail from the files, because a shell
+# counter cannot cross a process boundary.
+#
+# status ends as one of: ok, built (no checks were asked for), generate-failed,
+# build-failed, runtime-failed, checks-failed.
+############################################################################
+
+# _note <outfile> <kind> <detail> - record one failure for the report.
+_note() { printf '%s\t%s\n' "$2" "$3" >> "$1"; }
+
+_build_one() {
+  local spec="$1"
+  local id distro repo dockerfile context tag
+  IFS='|' read -r _ distro repo <<< "$spec"
+
+  id="${distro}-${repo}"
+  tag="${IMAGE_PREFIX}/${distro}:${repo}"
+
+  local d="${RUNDIR}/${id}"
+  mkdir -p "$d"
+  local log="${d}/build.log" fails="${d}/failures" status="${d}/status"
+  : > "$fails"
+  printf 'unknown' > "$status"
+  printf '%s\t%s\t%s\n' "$distro" "$repo" "$tag" > "${d}/meta"
+
+  # --- Choose the Dockerfile and its build args ---------------------------
+  # One static Dockerfile holds every option.  _REPO_STAGE picks the repo
+  # stage (a default build uses the plain repo-stable; anything else uses the
+  # general repo-other); REPO and REPO_CONF are read inside repo-other.
+  local bargs=(--progress=plain --build-arg "_CACHEBUST=${CACHEBUST_VALUE}")
+  dockerfile="${DOCKERFILES}/Dockerfile.${distro}"
+  context="${DOCKERFILES}"
+  if [[ ! -f "$dockerfile" ]]; then
+    _note "$fails" generate "no such Dockerfile: ${dockerfile}"
+    printf 'generate-failed' > "$status"
+    return 0
+  fi
+  bargs+=(--build-arg "REPO=${repo}" \
+          --build-arg "_REPO_STAGE=$(repo_stage "$repo" "$REPO_CONF")")
+  [[ -n "$REPO_CONF" ]] && bargs+=(--build-arg "REPO_CONF=${REPO_CONF}" \
+                                   --label "${IMAGE_PREFIX}.repo-conf=${REPO_CONF}")
+  [[ -n "$PIN_GCS_VERSION" ]] && bargs+=(--build-arg "GCS_VERSION=${PIN_GCS_VERSION}")
+
+  # --- Build -----------------------------------------------------------
+  (( REFRESH_BASE )) && bargs+=(--pull --build-arg "_BASE_CACHEBUST=${CACHEBUST_VALUE}")
+  (( NO_CACHE ))     && bargs+=(--no-cache)
+  [[ ${#EXTRA_BUILD_ARGS[@]} -gt 0 ]] && bargs+=("${EXTRA_BUILD_ARGS[@]}")
+  if [[ -n "$PROXY_URL" ]]; then
+    # Host networking so a proxy on this machine's loopback is reachable.  These
+    # are Docker's predefined proxy args: no ARG needed in the Dockerfile, and
+    # they are left out of the image history.
+    bargs+=(--network=host)
+    for _v in ALL_PROXY all_proxy HTTP_PROXY http_proxy HTTPS_PROXY https_proxy; do
+      bargs+=(--build-arg "${_v}=${PROXY_URL}")
+    done
+  fi
+
+  if ! docker build "${bargs[@]}" \
+        --label "${IMAGE_PREFIX}=1" \
+        --label "${IMAGE_PREFIX}.distro=${distro}" \
+        --label "${IMAGE_PREFIX}.repo=${repo}" \
+        -t "$tag" -f "$dockerfile" "$context" >"$log" 2>&1; then
+    _note "$fails" build "docker build failed — ${log}"
+    printf 'build-failed' > "$status"
+    return 0
+  fi
+  printf 'built' > "$status"
+  printf '%s' "$tag" > "${d}/image"
+
+  # --- Name the image after the GCS it contains ---------------------------
+  # The version is only known once GCS is installed, so ask the image, then add
+  # the version tag and label with a config-only rebuild.  This happens whether
+  # or not the checks run.  scripts/smoke.sh reads the version with the same
+  # pattern; keep them the same.
+  local version old_id vtag
+  version=$($TIMEOUT docker run --rm --entrypoint /bin/sh "$tag" -c \
+    'p=$(command -v globus-connect-server) && "$p" --version 2>&1 | grep -oE "[0-9]+\.[0-9]+\.[0-9]+([~.+-]?[A-Za-z]+[0-9]*)?" | head -1' \
+    2>/dev/null) || version=''
+  if [[ -n "$version" ]]; then
+    printf '%s' "$version" > "${d}/version"
+    if [[ -n "$EXPECT_GCS_VERSION" && "$version" != "$EXPECT_GCS_VERSION" ]]; then
+      _note "$fails" version "got ${version}, expected ${EXPECT_GCS_VERSION}"
+    fi
+    # A tag allows only letters, digits, '_', '.' and '-', so anything else in
+    # a version becomes '-'.  The label and the version file keep it as printed.
+    vtag="${IMAGE_PREFIX}/${distro}:${version//[^A-Za-z0-9_.-]/-}-${repo}"
+    old_id=$(docker image inspect -f '{{.Id}}' "$tag" 2>/dev/null || true)
+    if printf 'FROM %s\nLABEL %s.version=%s\n' "$tag" "$IMAGE_PREFIX" "$version" \
+         | docker build -q -t "$vtag" -t "$tag" - >>"$log" 2>&1; then
+      printf '%s' "$vtag" > "${d}/image"
+      # The unlabelled image is now untagged; drop it so runs don't pile up.
+      [[ -n "$old_id" ]] && docker rmi "$old_id" >/dev/null 2>&1 || true
+    else
+      _note "$fails" label "could not add the version tag and label — see ${log}"
+    fi
+  else
+    _note "$fails" version "could not read the GCS version from ${tag}"
+  fi
+
+  # --- Scan the log for notes ----------------------------------------------
+  _scan_notes "$log" "${d}/notes"
+
+  (( DO_CHECK )) || return 0
+
+  # --- Check the image from inside -----------------------------------------
+  # smoke.sh only observes; what counts as wrong is decided here, because the
+  # expected values depend on the repo.
+  local smoke_out="${d}/smoke.out"
+  if ! $TIMEOUT docker run --rm -i --entrypoint /bin/sh "$tag" -s \
+        < "$SMOKE" > "$smoke_out" 2>"${d}/smoke.err"; then
+    _note "$fails" runtime "smoke.sh did not complete — ${d}/smoke.err"
+    printf 'runtime-failed' > "$status"
+    return 0
+  fi
+
+  local k v
+  declare -A S=()
+  while IFS='=' read -r k v; do [[ -n "$k" ]] && S["$k"]="$v"; done < "$smoke_out"
+
+  # _expect <key> <wanted> - record a failure unless smoke.sh reported that value.
+  _expect() {
+    [[ "${S[$1]-}" == "$2" ]] || _note "$fails" runtime "$1=${S[$1]-<unset>}, expected $2"
+  }
+
+  _expect SYSTEMCTL_IS_MOCK   yes
+  _expect SYSTEMCTL_RESPONDS  yes
+  _expect DROPIN_GCS_MANAGER  yes
+  _expect DROPIN_OIDC         yes
+  _expect DROPINS_PARSE       yes
+
+  _expect ENTRYPOINT yes
+  if [[ ! "${S[GCS_VERSION]-}" =~ $GCS_VERSION_RE ]]; then
+    _note "$fails" runtime "GCS_VERSION=${S[GCS_VERSION]-<unset>} is not a version"
+  else
+    printf '%s' "${S[GCS_VERSION]}" > "${d}/version"
+  fi
+
+  # Exactly the repo this image was built for is enabled, and no other, so a
+  # later update cannot swap the package under test for another repo's.
+  _expect GLOBUS_REPOS_ENABLED "$repo"
+
+  [[ -s "$fails" ]] && printf 'checks-failed' > "$status" || printf 'ok' > "$status"
+  return 0
+}
+
+############################################################################
+# RUN
+#
+# Keep up to JOBS workers going.  The parent polls them once a second so it can
+# say what is happening: a line as each build starts and finishes, and on a
+# terminal a live line with the builds in flight and the elapsed time.
+############################################################################
+total=${#SPECS[@]}
+printf 'Building %d image(s), %d at a time — logs in %s\n' "$total" "$JOBS" "$RUNDIR"
+[[ -n "$PROXY_URL" ]] && printf 'Network access through the proxy %s\n' "$PROXY_URL"
+(( DO_CHECK )) || printf 'checks disabled (--no-check)\n'
+printf '\n'
+
+# _spec_id <spec> - the id used for a target's directory and messages.
+_spec_id() { local _k d r; IFS='|' read -r _k d r <<< "$1"; printf '%s-%s' "$d" "$r"; }
+
+# _clock <seconds> - m:ss.
+_clock() { printf '%d:%02d' $(( $1 / 60 )) $(( $1 % 60 )); }
+
+# _live_clear - erase the live line (terminal only).
+_live_clear() { (( TTY )) && printf '\r\033[K'; return 0; }
+
+# _live <done> - the live line (terminal) or a heartbeat every 60s (pipe), so a
+# long run never looks hung.
+_live() {
+  local done_n="$1" names='' n
+  for n in ${RUNNING_NAME[@]+"${RUNNING_NAME[@]}"}; do names+="${n} "; done
+  if (( TTY )); then
+    printf '\r\033[K  %s[%d/%d]%s building: %s(%s)' "$DIM" "$done_n" "$total" "$RST" \
+      "$(printf '%s' "$names" | cut -c1-$(( ${COLUMNS:-100} - 30 )))" "$(_clock "$SECONDS")"
+  elif (( SECONDS - LAST_BEAT >= 60 )); then
+    LAST_BEAT=$SECONDS
+    printf '  [%d/%d] still building: %s(%s)\n' "$done_n" "$total" "$names" "$(_clock "$SECONDS")"
+  fi
+  return 0
+}
+
+# _finished <id> <seconds> <done> - the line printed when a build finishes.
+_finished() {
+  local d="${RUNDIR}/$1" st img colour="$GRN"
+  st=$(<"${d}/status")
+  img=$([[ -f "${d}/image" ]] && cat "${d}/image" || printf -- '-')
+  [[ "$st" == ok || "$st" == built ]] || colour="$RED"
+  printf '  [%d/%d] %b%-14s%b %s (%s)\n' "$3" "$total" "$colour" "$st" "$RST" "$img" "$(_clock "$2")"
+}
+
+declare -A RUNNING_ID=() RUNNING_NAME=() RUNNING_T0=()
+next=0
+finished=0
+LAST_BEAT=0
+while (( next < total || ${#RUNNING_ID[@]} > 0 )); do
+  while (( next < total && ${#RUNNING_ID[@]} < JOBS )); do
+    spec="${SPECS[$next]}"
+    _build_one "$spec" &
+    RUNNING_ID[$!]="$(_spec_id "$spec")"
+    RUNNING_NAME[$!]="$(cut -d'|' -f2 <<< "$spec")"
+    RUNNING_T0[$!]=$SECONDS
+    _live_clear
+    printf '  starting %s\n' "${RUNNING_ID[$!]}"
+    next=$(( next + 1 ))
+  done
+  sleep 1
+  for pid in "${!RUNNING_ID[@]}"; do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      wait "$pid" || true
+      finished=$(( finished + 1 ))
+      _live_clear
+      _finished "${RUNNING_ID[$pid]}" $(( SECONDS - RUNNING_T0[$pid] )) "$finished"
+      unset "RUNNING_ID[$pid]" "RUNNING_NAME[$pid]" "RUNNING_T0[$pid]"
+    fi
+  done
+  _live "$finished"
+done
+_live_clear
+printf '\n'
+
+# _latest_gcs <repo> - the newest GCS version the repo publishes, in the form
+# 'globus-connect-server --version' prints it; nothing if it cannot be read.
+# One deb index is enough: the check assumes a repo carries the same GCS release
+# for every distro, which is also what the version warning above looks for.  The
+# index sorts as dpkg does, so 5.4.100~rc1 comes before 5.4.100.  The packages
+# spell a pre-release with '~' where --version prints '-', so the answer is
+# translated to the --version form.
+_latest_gcs() {
+  local repo="$1" site=https://downloads.globus.org rel v=''
+  [[ "$repo" == pre-* ]] && site=https://builds.globus.org/downloads.globus.org
+  for rel in noble jammy bookworm; do
+    v=$(curl -fsS --max-time 30 ${PROXY_URL:+--proxy "$PROXY_URL"} \
+          "${site}/globus-connect-server/${repo#pre-}/deb/dists/${rel}/contrib/binary-amd64/Packages" 2>/dev/null \
+        | awk '$1 == "Package:" { p = ($2 == "globus-connect-server54") }
+               p && $1 == "Version:" { print $2 }' \
+        | sed 's/-.*//' | sort -V | tail -1) || v=''
+    [[ -n "$v" ]] && break
+  done
+  printf '%s' "${v//\~/-}"
+}
+
+############################################################################
+# REPORT
+#
+# A table of results, then each failure, the GCS version check, the notes, and
+# the pass/fail summary.
+############################################################################
+printf '%-16s %-12s %-15s %s\n' DISTRO REPO STATUS IMAGE
+printf '%-16s %-12s %-15s %s\n' '------' '----' '------' '-----'
+
+declare -A VERSIONS=() VERSION_OF=()
+for d in "$RUNDIR"/*/; do
+  [[ -f "${d}/meta" ]] || continue
+  IFS=$'\t' read -r distro repo _tag < "${d}/meta"
+  status=$(cat "${d}/status")
+  image=$([[ -f "${d}/image" ]] && cat "${d}/image" || printf -- '-')
+  id="${distro}/${repo}"
+
+  # A recorded failure (say, the wrong GCS version) outranks the status.
+  [[ -s "${d}/failures" ]] && status=checks-failed
+
+  # Without checks, 'built' is as good as a build gets.
+  good=0; [[ "$status" == ok ]] && good=1
+  (( DO_CHECK )) || { [[ "$status" == built ]] && good=1; }
+  colour="$GRN"; (( good )) || colour="$RED"
+  printf '%-16s %-12s %b%-15s%b %s\n' \
+    "$distro" "$repo" "$colour" "$status" "$RST" "$image"
+
+  # One result per image, so the summary counts images, not failure lines.
+  if (( good )); then
+    _pass "$id"
+  else
+    details=''
+    while IFS=$'\t' read -r kind detail; do
+      [[ -n "$kind" ]] && details+="${details:+; }${kind}: ${detail}"
+    done < "${d}/failures"
+    # A failure with no recorded detail still has to register.
+    _fail "$id" "${details:-$status}"
+  fi
+
+  if [[ -f "${d}/version" ]]; then
+    VERSIONS["$(cat "${d}/version")"]=1
+    VERSION_OF["${distro}/${repo}"]=$(cat "${d}/version")
+  fi
+done
+printf '\n'
+
+# --- GCS versions ----------------------------------------------------------
+# With an expected version, a wrong image has already failed above.  Without
+# one the dev has only the image names to go on, so warn (never fail) when the
+# versions differ from each other, or from the newest the repo publishes.  The
+# second catches what the first cannot: a build of a single distro.
+if (( ${#VERSIONS[@]} == 1 )); then
+  printf 'GCS version: %s\n\n' "${!VERSIONS[*]}"
+fi
+if [[ -z "$EXPECT_GCS_VERSION" ]] && (( ${#VERSION_OF[@]} > 0 )); then
+  warned=0
+  if (( ${#VERSIONS[@]} > 1 )); then
+    warned=1
+    printf '%sWARNING%s: the images have different GCS versions:\n' "$YLW" "$RST"
+    for v in "${!VERSIONS[@]}"; do
+      printf '  %s:' "$v"
+      for k in "${!VERSION_OF[@]}"; do [[ "${VERSION_OF[$k]}" == "$v" ]] && printf ' %s' "$k"; done
+      printf '\n'
+    done
+  fi
+  declare -A LATEST_DONE=()
+  for k in "${!VERSION_OF[@]}"; do
+    r="${k#*/}"
+    [[ -z "${LATEST_DONE[$r]:-}" ]] || continue
+    latest=$(_latest_gcs "$r")
+    LATEST_DONE[$r]="${latest:-unknown}"
+    if [[ -z "$latest" ]]; then
+      printf '%sNote: could not read the newest GCS version published to %s (network or VPN?); not compared.%s\n' \
+        "$DIM" "$r" "$RST"
+      continue
+    fi
+    for k2 in "${!VERSION_OF[@]}"; do
+      [[ "${k2#*/}" == "$r" && "${VERSION_OF[$k2]}" != "$latest" ]] || continue
+      warned=1
+      printf '%sWARNING%s: %s has GCS %s, but the newest in the %s repo is %s\n' \
+        "$YLW" "$RST" "${k2%%/*}" "${VERSION_OF[$k2]}" "$r" "$latest"
+    done
+  done
+  (( warned )) && printf '\n'
+fi
+
+# --- Notes: what the log scans found, grouped by pattern -------------------
+# Informational: nothing here affects a result.
+declare -A NOTE_IMAGES=() NOTE_EXAMPLE=()
+NOTICES=()
+for d in "$RUNDIR"/*/; do
+  [[ -s "${d}/notes" ]] || continue
+  IFS=$'\t' read -r distro repo _t < "${d}/meta"
+  while IFS=$'\t' read -r label _n first; do
+    if [[ "$label" == notice ]]; then NOTICES+=("${distro}/${repo}: ${first}"); continue; fi
+    NOTE_IMAGES[$label]+="${NOTE_IMAGES[$label]:+, }${distro}/${repo}"
+    [[ -n "${NOTE_EXAMPLE[$label]:-}" ]] || NOTE_EXAMPLE[$label]="$first"
+  done < "${d}/notes"
+done
+if (( ${#NOTICES[@]} > 0 )); then
+  printf 'Notices from the Dockerfiles:\n\n'
+  printf '  %s\n' "${NOTICES[@]}"
+  printf '\n'
+fi
+if (( ${#NOTE_IMAGES[@]} > 0 )); then
+  printf 'Notes from the build logs (informational; they do not affect the results):\n'
+  for i in "${!NOTE_LABEL[@]}"; do
+    label="${NOTE_LABEL[$i]}"
+    [[ -n "${NOTE_IMAGES[$label]:-}" ]] || continue
+    printf '\n  %s%s%s: %s\n' "$YLW" "$label" "$RST" "${NOTE_IMAGES[$label]}"
+    printf '      %s\n' "${NOTE_WHY[$i]}"
+    printf '      e.g. %s\n' "${NOTE_EXAMPLE[$label]}"
+  done
+  printf '\n  Counts per image: %s/<image>/notes.  Search the full log: %s/<image>/build.log\n\n' "$RUNDIR" "$RUNDIR"
+fi
+
+report "image checks" "images"

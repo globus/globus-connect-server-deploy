@@ -5,6 +5,7 @@
   removed the gcs_repo variable (unstable, testing, pre-stable) and the
   gcs_proxy variable
 * Ansible: a failed EPEL key import no longer starts the interactive debugger
+* Fixed typos in the Ansible comments and README, and in the 2.0.0 entry below
 
 3.0.0: Fri Mar 6 3:40:00 PM CDT 2026
 * Added Terraform installation and management support
@@ -78,7 +79,7 @@
 * Debian and Ubuntu Docker images use the correct repo definitions
 
 2.0.0: Tue Dec 20 10:52:03 CST 2022
-* Added Anisble installation support.
+* Added Ansible installation support.
 * Overhauled Docker image building to support all GCS-supported distros.
 
 1.9.0: Thu Dec  2 22:37:25 UTC 2021

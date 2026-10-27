@@ -7,13 +7,12 @@
 #
 #  ansible_os_family: Suse
 #  ansible_distribution_major_version: 15
-#  ansible_distribution_release": 4
-#  ansible_distribution_version": 15.4
-#  ansible_distribution: openSUSE Leap
+#  ansible_distribution_version: 15.6
+#  ansible_distribution: openSUSE Leap | SLES
 #
 
-# Import the GLOBUS key explicitly because the Ansible zypper module doesn't auto-import
-# keys they way zypper will
+# Import the Globus key explicitly because the Ansible zypper module doesn't
+# auto-import keys the way zypper will.
 - name: Install the GCS RPM repository key (2024)
   become: yes
   rpm_key:

@@ -6,12 +6,12 @@
 # Ansible facts of interest:
 #
 #  ansible_os_family: RedHat | Springdale
-#  ansible_distribution_major_version: 8 | 9 | 10 | 41 | 42
+#  ansible_distribution_major_version: 8 | 9 | 10 | 43 | 44
 #  ansible_distribution: AlmaLinux | CentOS | Fedora | OracleLinux | RedHat | Rocky | Springdale
 #
 
 # Import the EPEL key explicitly because the Ansible yum module doesn't auto-import
-# keys the way yum/dnf will
+# keys the way yum/dnf will.
 - name: Install the EPEL RPM repository key
   become: yes
   rpm_key:
@@ -27,7 +27,7 @@
   when:
     - ansible_facts['distribution'] != "Fedora"
 
-# Expliclity install this even though it is a soft dependency on the EPEL repo rpm because
+# Explicitly install this even though it is a soft dependency on the EPEL repo rpm because
 # auto-installation of soft dependencies is configurable and some distros have it disabled.
 - name: Install dnf config-manager
   become: yes

@@ -6,8 +6,8 @@
 # Ansible facts of interest:
 #
 #  ansible_os_family: Debian
-#  ansible_distribution_major_version: 10 | 11 | 18 | 20 | 22
-#  ansible_distribution_release: buster | bullseye | bionic | focal | jammy | kinetic
+#  ansible_distribution_major_version: 11 | 12 | 22 | 24
+#  ansible_distribution_release: bullseye | bookworm | jammy | noble
 #  ansible_distribution: Debian | Ubuntu
 #
 
@@ -22,7 +22,7 @@
   apt:
     update_cache: yes
 
-- name: Install the Globus Connect Server
+- name: Install Globus Connect Server
   become: yes
   apt:
     name: globus-connect-server54

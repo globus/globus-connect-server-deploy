@@ -278,11 +278,17 @@ ARG GCS_PACKAGE=globus-connect-server54
 ARG GCS_VERSION=
 
 # --- Install GCS ------------------------------------------------------
+# selinux-policy-targeted is named here, in the same transaction, for two reasons.
+# GCS's install script loads its SELinux module into the targeted policy, but the
+# package asks for a policy only generically, so on a bare image the solver picks
+# selinux-policy-minimum and the load fails ('Failed to resolve roletype').  And it
+# has to be the same RUN: a policy installed by an earlier RUN is in a lower image
+# layer, where the store's directory rename fails ('Invalid cross-device link').
 RUN pkg="${GCS_PACKAGE}" \
  && if [ -n "${GCS_VERSION}" ]; then \
         pkg="${GCS_PACKAGE}-$(printf '%s' "${GCS_VERSION}" | tr - '~')"; \
     fi \
- && dnf install -y "${pkg}" \
+ && dnf install -y selinux-policy-targeted "${pkg}" \
  && dnf clean all
 
 ############################################################################

@@ -6,6 +6,10 @@
   gcs_proxy variable
 * Ansible: a failed EPEL key import no longer starts the interactive debugger
 * Fixed typos in the Ansible comments and README, and in the 2.0.0 entry below
+* Docker: GCS services are started through a systemctl stand-in (a Python
+  script that mimics systemctl) that runs the unit files the GCS packages
+  install, with drop-ins for the container. This includes the OIDC service,
+  which the old entrypoint could not start
 
 3.0.0: Fri Mar 6 3:40:00 PM CDT 2026
 * Added Terraform installation and management support

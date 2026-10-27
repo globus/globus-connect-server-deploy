@@ -23,6 +23,8 @@
   The README shows the docker build and docker run commands; images are
   tagged with whatever you pass to --tag, and docker-run-gcs's options now
   go in the NODE_SETUP_ARGS environment variable
+* Docker: build arguments REPO and REPO_CONF choose the Globus repository,
+  replacing GCS_REPO and GCS_PROXY
 
 3.0.0: Fri Mar 6 3:40:00 PM CDT 2026
 * Added Terraform installation and management support

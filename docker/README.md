@@ -66,10 +66,11 @@ $ docker build \
 
 To pick up a newer GCS or newer distro packages, rebuild with `--no-cache`: Docker otherwise reuses the layers of the previous build, including the GCS install.
 
-#### Other Versions
-By default the image installs the newest GCS version in the stable GCS repository. A build argument changes that:
+#### Other Repos and Versions
+By default the image is built from the stable GCS repository, with the newest GCS version in it. Build arguments change that:
 
 ```shell
+$ docker build --build-arg REPO=unstable ...       # unstable or testing; the pre-* repos are internal and need the Globus VPN
 $ docker build --build-arg GCS_VERSION=5.4.99 ...  # install exactly this version
 ```
 

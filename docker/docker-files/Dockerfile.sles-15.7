@@ -1,0 +1,256 @@
+# family: suse
+
+############################################################################
+# LAYOUT
+#
+# The stages, top to bottom.  Details: docker-files/README.md.
+#
+#   base               the starting image   (differs per distro)
+#   pre-repo           distro update, systemd guard, CACHE BARRIER, systemctl mock
+#   repo-stable        sets up the stable repo     \ one of the two is built, chosen
+#   repo-other         sets up any other repo      / by ARG _REPO_STAGE
+#   install            installs ${GCS_PACKAGE} from that repo
+#   final              deployment files, ports, entrypoint  (the image users run)
+#
+# Each stage is a banner, saying what the stage is for, then its FROM line.
+# This ARG is read by FROM lines, so it must sit above the first one.
+# scripts/build sets _REPO_STAGE (stable for a default build, other for the
+# rest); make export removes it.  ARG REPO and ARG REPO_CONF belong to
+# repo-other.
+############################################################################
+ARG _REPO_STAGE=other
+
+############################################################################
+# STAGE: base
+#
+# The starting image.
+############################################################################
+FROM registry.suse.com/suse/sle15:15.7 AS base
+
+############################################################################
+# STAGE: pre-repo
+#
+# Distro layers, before any Globus content; shared by every repo.  In order:
+#   1. update the distro packages   2. install python3 + systemd
+#   3. guard systemctl              4. cache barrier   5. install the systemctl mock
+############################################################################
+FROM base AS pre-repo
+
+# --- 1. Distro package update -----------------------------------------
+# Docker Hub images lag the distro's security updates, sometimes by months.
+# _BASE_CACHEBUST re-runs this step (use it with 'docker build --pull').
+# 'update', not 'dup': stays within the installed products, no vendor changes.
+# An explicit refresh is required first — zypper will not fetch metadata on its
+# own in a fresh container.
+ARG _BASE_CACHEBUST=0
+RUN echo "_BASE_CACHEBUST=${_BASE_CACHEBUST}" \
+ && zypper --non-interactive --gpg-auto-import-keys refresh \
+ && zypper --non-interactive update \
+ && zypper clean -a
+
+# --- 2. systemctl mock prerequisites ----------------------------------
+# Install python311 and systemd now, at the current repo version, before the
+# zypper addlock below prevents further updates.  python311 does not create
+# /usr/bin/python3 automatically on SUSE 15; the symlink is added below.
+RUN zypper install -y python311 systemd \
+ && ln -sf /usr/bin/python3.11 /usr/bin/python3 \
+ && zypper clean -a
+
+# --- 3. Protect /usr/bin/systemctl from package updates ---------------
+# Prevent zypper from updating the systemd package so that installing GCS cannot
+# overwrite our mock symlink at /usr/bin/systemctl.
+RUN zypper addlock systemd
+
+# --- 4. CACHE BARRIER -------------------------------------------------
+# Above: distro-provided, safe to cache.  Below: ours and Globus's, never cached.
+# _CACHEBUST changes on every build, so every layer from here down always runs.
+# The echo is deliberate: the build log shows whether this layer ran or was CACHED.
+# To iterate with everything cached, pass a fixed --build-arg _CACHEBUST=<value>.
+ARG _CACHEBUST=0
+RUN echo "_CACHEBUST=${_CACHEBUST}"
+
+# --- 5. Install systemctl mock ----------------------------------------
+# Must be in place before GCS so the mock answers the systemctl calls the
+# package's install scripts make.
+# SUSE 15 has no /usr merge, so /bin and /usr/bin are separate and PATH finds
+# /usr/bin/systemctl first; link that one.  The addlock above stops the systemd
+# package from replacing the link; busybox can still, see 'Restore systemctl
+# mock symlink' in stage install.
+COPY systemctl/systemctl_mock.py /gcs-deploy/systemctl-mock
+RUN chmod +x /gcs-deploy/systemctl-mock \
+ && ln -sf /gcs-deploy/systemctl-mock /usr/bin/systemctl
+
+############################################################################
+# STAGE: repo-stable
+#
+# Sets up the stable GCS package repository and its prerequisites.  GCS
+# itself is installed later, in stage install.
+############################################################################
+FROM pre-repo AS repo-stable
+
+# --- Prerequisites ----------------------------------------------------
+RUN zypper install -y curl \
+ && zypper clean -a
+
+# --- Globus repository ------------------------------------------------
+RUN curl -LOs https://downloads.globus.org/globus-connect-server/stable/installers/repo/rpm/globus-repo-latest.noarch.rpm \
+ && rpm -i globus-repo-latest.noarch.rpm \
+ && rm globus-repo-latest.noarch.rpm \
+ && zypper --gpg-auto-import-keys refresh
+
+############################################################################
+# STAGE: repo-other
+#
+# Sets up every repo that repo-stable does not: unstable, testing, the
+# internal pre-stable, pre-unstable and pre-testing (they need the Globus
+# VPN), or stable with its definitions taken from somewhere else.  A default
+# build uses repo-stable, which is all that make export keeps for one.  Every
+# combination here is one piece of shell, so this stage is busier.
+#
+# Two settings drive it.  REPO is the repo the packages come from.
+# REPO_CONF is the repo whose globus-repo package supplies the definitions
+# (the signing key and one stanza per repo); empty means the same as REPO.
+# They differ when a new distro or key is only in a pre- repo's package:
+# REPO=unstable REPO_CONF=pre-stable.  A pre- REPO derives its stanza from
+# the public one with builds.globus.org/ in front of the URL, whatever
+# REPO_CONF is.
+#
+# In order: 1. prerequisites (deb, suse), 2. install globus-repo, 3. switch to REPO.
+# Step 3 disables the stable repo before it refreshes anything, so a
+# non-stable build never reads the stable index.  The ARGs below are read
+# only here.
+############################################################################
+FROM pre-repo AS repo-other
+
+ARG REPO=stable
+ARG REPO_CONF=
+
+# --- 1. Prerequisites -------------------------------------------------
+RUN zypper install -y curl \
+ && zypper clean -a
+
+# --- 2. Globus repository ---------------------------------------------
+# rpm -i rather than 'zypper install <url>' so the package's posttrans runs and
+# copies its templates into /etc/zypp/repos.d.
+RUN conf="${REPO_CONF:-${REPO}}" \
+ && case "${conf}" in \
+      stable|unstable|testing) \
+        site=https://downloads.globus.org; channel=${conf} ;; \
+      pre-stable|pre-unstable|pre-testing) \
+        site=https://builds.globus.org/downloads.globus.org; channel=${conf#pre-} ;; \
+      *) echo "REPO_CONF must be stable, unstable, testing, pre-stable, pre-unstable or pre-testing, not '${conf}'" >&2; exit 1 ;; \
+    esac \
+ && curl -LOs "${site}/globus-connect-server/${channel}/installers/repo/rpm/globus-repo-latest.noarch.rpm" \
+ && rpm -i globus-repo-latest.noarch.rpm \
+ && rm globus-repo-latest.noarch.rpm
+
+# --- 3. Switch to REPO ------------------------------------------------
+# The package ships one stanza per repo: stable enabled, the others disabled.
+# A pre- REPO derives its stanza from the public one the package defined, so
+# gpgcheck, repo_gpgcheck, priority, the gpgkey file path and $releasever are
+# inherited rather than reinvented.  The mirror path is literally
+# 'builds.globus.org/' followed by the entire downloads.globus.org URL, so the
+# rewrite is a pure prefix insertion.  Everything but stable then disables the
+# stable repo, before the refresh.
+RUN set -e \
+ && channel=${REPO#pre-} \
+ && case "${channel}" in \
+      stable) name=Stable ;; \
+      unstable) name=Unstable ;; \
+      testing) name=Testing ;; \
+      *) echo "REPO must be stable, unstable, testing, pre-stable, pre-unstable or pre-testing, not '${REPO}'" >&2; exit 1 ;; \
+    esac \
+ && if [ "${REPO}" != "${channel}" ]; then \
+        src=$(ls /etc/zypp/repos.d/globus-connect-server-5-${channel}-*.repo | head -1); \
+        sed -e "s/^\[Globus-Connect-Server-5-${name}\]\$/[Globus-Connect-Server-5-Pre-${name}]/" \
+            -e "s/^name=.*/name=Globus Connect Server 5 Pre-${name}/" \
+            -e 's|https://downloads\.globus\.org/|https://builds.globus.org/downloads.globus.org/|' \
+            "${src}" > /etc/zypp/repos.d/globus-connect-server-5-${REPO}.repo; \
+        name=Pre-${name}; \
+    fi \
+ && if [ "${REPO}" != stable ]; then \
+        zypper modifyrepo --disable Globus-Connect-Server-5-Stable \
+        && zypper modifyrepo --enable Globus-Connect-Server-5-${name}; \
+    fi \
+ && zypper --gpg-auto-import-keys refresh
+
+############################################################################
+# STAGE: install
+#
+# Installs GCS from the selected repo.
+############################################################################
+FROM repo-${_REPO_STAGE} AS install
+
+# GCS_VERSION pins the GCS version, as 'globus-connect-server --version' prints
+# it (5.4.99, 5.4.100-rc1).  Empty installs the newest in the repo.  The packages
+# spell a pre-release 5.4.100~rc1, which is what the tr in the install step is for.
+ARG GCS_PACKAGE=globus-connect-server54
+ARG GCS_VERSION=
+
+# --- Install GCS with openSUSE Leap OSS as a libnice source -----------
+# globus-xio-udt-driver requires libnice, which is not in the SLES BCI repos.
+# The canonical SLES source is PackageHub, but PackageHub requires a SUSE
+# Customer Center registration code (SUSEConnect returns HTTP 401 in unregistered
+# container builds).  openSUSE Leap OSS is publicly accessible and carries
+# libnice in a format compatible with the Globus SLES RPMs.
+#
+# The Leap repo must be present during the GCS install transaction so zypper's
+# solver can resolve the libnice dep inline.  Pre-installing libnice separately
+# does not work: if libnice is already installed at any version zypper treats the
+# dep as satisfied and will not pull the version the Globus RPMs actually need.
+#
+# The echo is a notice: it makes the build output say that this image takes a
+# package from another distro.
+#
+# Leap version: there is no Leap 15.7 (SUSE moved directly to Leap 16 after 15.6),
+# so SLES 15.x uses the Leap 15.6 repo; libnice's ABI (libnice.so.10) is stable
+# across that range.  Any other SLES uses the Leap repo of the same version.
+RUN . /etc/os-release \
+ && case "${VERSION_ID}" in \
+      15.*) LEAP_VER=15.6 ;; \
+      *)    LEAP_VER="${VERSION_ID}" ;; \
+    esac \
+ && echo "GCS-DEPLOY-NOTICE: libnice, a GCS dependency, comes from the openSUSE Leap ${LEAP_VER} repo; this Dockerfile has no access to the SLES repos, which need a SUSE subscription." \
+ && zypper addrepo -f \
+      "https://download.opensuse.org/distribution/leap/${LEAP_VER}/repo/oss/" \
+      openSUSE-Leap-OSS \
+ && zypper --gpg-auto-import-keys refresh \
+ && pkg="${GCS_PACKAGE}" \
+ && if [ -n "${GCS_VERSION}" ]; then \
+        pkg="${GCS_PACKAGE}=$(printf '%s' "${GCS_VERSION}" | tr - '~')"; \
+    fi \
+ && zypper install -y "${pkg}" \
+ && zypper removerepo openSUSE-Leap-OSS \
+ && zypper clean -a
+
+# --- Restore systemctl mock symlink -----------------------------------
+# Installing GCS pulls in busybox, which ships its own /usr/bin/systemctl stub
+# and (seen on SUSE 15) overwrites the mock symlink made in pre-repo step 5.
+# Re-link it so the final image uses the mock.  Every SUSE file has this step,
+# so they stay the same.
+RUN ln -sf /gcs-deploy/systemctl-mock /usr/bin/systemctl
+
+############################################################################
+# STAGE: final
+#
+# The image users run: GCS installed, deployment files, ports, entrypoint.
+# For a shell instead of GCS: docker run -it --entrypoint /bin/bash <image>
+############################################################################
+FROM install AS final
+
+# --- GCS deployment files ---------------------------------------------
+COPY entrypoint/entrypoint.sh /gcs-deploy/entrypoint.sh
+COPY entrypoint/gcs_manager.service.d/ /gcs-deploy/gcs_manager.service.d/
+COPY entrypoint/globus-oidc.service.d/ /gcs-deploy/globus-oidc.service.d/
+RUN chmod +x /gcs-deploy/entrypoint.sh \
+ && mkdir -p /etc/systemd/system \
+ && ln -sf /gcs-deploy/gcs_manager.service.d \
+           /etc/systemd/system/gcs_manager.service.d \
+ && ln -sf /gcs-deploy/globus-oidc.service.d \
+           /etc/systemd/system/globus-oidc.service.d
+
+# 443        : GCS Manager API + HTTPS collection access
+# 50000-51000: Default inbound data transfer port range
+EXPOSE 443/tcp 50000-51000/tcp
+
+ENTRYPOINT ["/gcs-deploy/entrypoint.sh"]

@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""export - write one distro's Dockerfile for a single repo.
+
+Usage: export <distro> [--repo REPO] [--repo-conf REPO] [--gcs-version V]
+                                                        (result on stdout)
+
+    --repo       stable | unstable | testing |
+                 pre-stable | pre-unstable | pre-testing   [stable]
+    --repo-conf  where the globus-repo package comes from; same values  [= repo]
+    --gcs-version  the GCS version to install, as the default of ARG
+                 GCS_VERSION (5.4.99, 5.4.100-rc1)  [empty: the newest]
+
+A source Dockerfile holds every repo as a separate stage and picks one with
+`FROM repo-${_REPO_STAGE}`.  The repo stage is repo-stable for a default build
+(repo stable, no other REPO_CONF) and repo-other for anything else.  This follows
+the chain from the last stage back to the base, the way BuildKit does, and writes
+out only the stages on the path: the selector is filled in and the
+`ARG _REPO_STAGE` line above the first FROM is gone.  So the default result has no
+trace of repos or REPO_CONF.  The `ARG REPO` and `ARG REPO_CONF` that repo-other
+declares stay, with the chosen values as their defaults.  The result builds with
+a plain `docker build -f Dockerfile.<distro> .`.
+
+What goes with what: the comment block directly above a `FROM` (its banner)
+belongs to that stage, and the block directly above `ARG _REPO_STAGE` (the LAYOUT map)
+belongs to the ARG line.  Whatever is dropped takes its comment with it.
+
+The default is stable: no repo selection is left in the result.
+"""
+import argparse
+import os
+import re
+import sys
+
+REPOS = ("stable", "unstable", "testing", "pre-stable", "pre-unstable", "pre-testing")
+FROM_RE = re.compile(r"^FROM\s+(\S+)(?:\s+AS\s+(\S+))?", re.IGNORECASE)
+
+
+ARG_RE = re.compile(r"^ARG\s+_REPO_STAGE(=.*)?\s*$")
+STAGE_ARG_RE = re.compile(r"^ARG\s+(REPO|REPO_CONF)(=.*)?\s*$")
+VERSION_ARG_RE = re.compile(r"^ARG\s+GCS_VERSION(=.*)?\s*$")
+VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+([~.+-]?[A-Za-z]+[0-9]*)?$")
+
+
+def repo_stage(repo, repo_conf):
+    """The repo stage a build uses: repo-stable for a default build, else repo-other."""
+    return "stable" if repo == "stable" and repo_conf in ("", "stable") else "other"
+
+
+def block_above(lines, i):
+    """Indexes of the contiguous '#' lines directly above line i: the banner and
+    comment that belong to the statement there."""
+    j = i
+    while j > 0 and lines[j - 1].startswith("#"):
+        j -= 1
+    return range(j, i)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("distro")
+    ap.add_argument("--repo", default="stable", choices=REPOS)
+    ap.add_argument("--repo-conf", default="", choices=("",) + REPOS)
+    ap.add_argument("--gcs-version", default="")
+    args = ap.parse_args()
+    if args.gcs_version and not VERSION_RE.match(args.gcs_version):
+        sys.exit(f"export: '{args.gcs_version}' is not a GCS version (5.4.99, 5.4.100-rc1)")
+
+    stage = repo_stage(args.repo, args.repo_conf)
+    root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+    path = os.path.join(root, "docker-files", f"Dockerfile.{args.distro}")
+    if not os.path.isfile(path):
+        sys.exit(f"export: no Dockerfile for '{args.distro}' (see: make list)")
+    with open(path, encoding="utf-8") as fh:
+        lines = fh.read().split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+
+    # --- Split the file into stages ---------------------------------------
+    # stage_of[i] is the stage that line i belongs to (an index into `stages`),
+    # or -1 for the preamble above the first FROM.
+    stages, stage_of = [], []
+    for i, line in enumerate(lines):
+        m = FROM_RE.match(line)
+        if m:
+            image = m.group(1).replace("${_REPO_STAGE}", stage)
+            stages.append({"image": image, "name": m.group(2)})
+            # The comment block directly above a FROM describes that stage.
+            for j in block_above(lines, i):
+                stage_of[j] = len(stages) - 1
+        stage_of.append(len(stages) - 1)
+
+    by_name = {s["name"]: n for n, s in enumerate(stages) if s["name"]}
+    if "base" not in by_name:
+        sys.exit(f"export: {path} has no 'base' stage")
+    if f"repo-{stage}" not in by_name:
+        sys.exit(f"export: {path} has no 'repo-{stage}' stage")
+
+    # --- Choose the stages to keep ----------------------------------------
+    # Follow the chain from the last stage back to the base, as BuildKit does.
+    keep, n = set(), len(stages) - 1
+    while True:
+        keep.add(n)
+        parent = by_name.get(stages[n]["image"])
+        if parent is None or parent in keep:
+            break
+        n = parent
+    # Stages above 'base' are bootstraps for distros with no Docker Hub image.
+    keep.update(range(by_name["base"]))
+
+    # --- Write the result -------------------------------------------------
+    # The ARG _REPO_STAGE line above the first FROM goes, and so does the
+    # comment block above it.  (Later ARG REPO lines belong to a stage.)
+    first_from = next(i for i, l in enumerate(lines) if FROM_RE.match(l))
+    gone = set()
+    for i, line in enumerate(lines[:first_from]):
+        if ARG_RE.match(line):
+            gone.add(i)
+            gone.update(block_above(lines, i))
+
+    out, removed, lastblank = [], False, False
+    for i, line in enumerate(lines):
+        dropped = i in gone or (stage_of[i] >= 0 and stage_of[i] not in keep)
+        if dropped:
+            removed = True
+            continue
+        if FROM_RE.match(line):
+            line = line.replace("${_REPO_STAGE}", stage)
+        # The ARGs a stage declares for its own RUN get the chosen values.
+        m = STAGE_ARG_RE.match(line)
+        if m and i > first_from:
+            value = args.repo if m.group(1) == "REPO" else args.repo_conf
+            line = f"ARG {m.group(1)}={value}"
+        # A pinned version becomes the default of the ARG the install step reads.
+        if args.gcs_version and VERSION_ARG_RE.match(line):
+            line = f"ARG GCS_VERSION={args.gcs_version}"
+        # A removed block leaves the blank line that followed it; don't double up.
+        if removed and line == "" and lastblank:
+            continue
+        out.append(line)
+        lastblank = line == ""
+        if line:
+            removed = False
+    while out and out[-1] == "":
+        out.pop()
+    sys.stdout.buffer.write(("\n".join(out) + "\n").encode("utf-8"))
+
+
+if __name__ == "__main__":
+    main()

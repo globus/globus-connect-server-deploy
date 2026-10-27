@@ -31,6 +31,7 @@
 * Added Docker support for Ubuntu 26.04, Fedora 44, SLES 15.7, SLES 16.0 and
   openSUSE Leap 16.0. The SUSE images are named sles-... and opensuse-...,
   and the SLES images take libnice from the openSUSE Leap repository
+* Docker: make export writes the Dockerfile for one distro and one repository
 
 3.0.0: Fri Mar 6 3:40:00 PM CDT 2026
 * Added Terraform installation and management support

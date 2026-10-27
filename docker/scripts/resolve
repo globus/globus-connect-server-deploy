@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""resolve - print the Dockerfile text one build would actually use.
+
+Usage: scripts/resolve <distro> [--repo REPO] [--repo-conf REPO]
+
+A source Dockerfile holds every repo as a separate stage and picks one with
+`FROM repo-${_REPO_STAGE}`.  This follows that chain from the last stage back to
+the base, the way BuildKit does, and prints the stages on the path.
+scripts/check-content asserts against that text.
+
+How it differs from scripts/export: export writes a file you can build, with the
+selector filled in.  This is for inspection only: it keeps the selector as it
+is, and leaves out any stage with no instructions.
+"""
+import argparse
+import os
+import re
+import sys
+
+STAGE_RE = re.compile(r"^FROM\s+(\S+)(?:\s+AS\s+(\S+))?")
+
+
+def block_above(lines, i):
+    """Indexes of the contiguous '#' lines directly above line i: the banner and
+    comment that belong to the statement there."""
+    j = i
+    while j > 0 and lines[j - 1].startswith("#"):
+        j -= 1
+    return range(j, i)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("distro")
+    ap.add_argument("--repo", default="stable")
+    ap.add_argument("--repo-conf", default="")
+    args = ap.parse_args()
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(here, "..", "docker-files", f"Dockerfile.{args.distro}")
+    if not os.path.isfile(path):
+        sys.exit(f"resolve: no Dockerfile for '{args.distro}'")
+
+    # --- Split the file into stages ---------------------------------------
+    # `preamble` is whatever precedes the first FROM, minus the `# family:` and
+    # ARG _REPO_STAGE line.  Each stage keeps its FROM line, the comment
+    # block above it (`above`) and the lines below it (`body`).
+    preamble, stages = [], []
+    with open(path) as fh:
+        text = fh.read()
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        m = STAGE_RE.match(line)
+        if m:
+            # The comment block directly above a FROM is that stage's banner;
+            # take it from the end of the previous stage's body.
+            above = [lines[k] for k in block_above(lines, i)]
+            if stages:
+                del stages[-1]["body"][len(stages[-1]["body"]) - len(above):]
+            else:
+                del preamble[len(preamble) - len(above):]
+            stages.append({"from": line, "image": m.group(1), "name": m.group(2), "body": [], "above": above})
+        elif stages:
+            stages[-1]["body"].append(line)
+        elif not (line.startswith("# family:") or re.match(r"^ARG _REPO_STAGE=", line)):
+            preamble.append(line)
+
+    by_name = {s["name"]: s for s in stages if s["name"]}
+    base_at = next((i for i, s in enumerate(stages) if s["name"] == "base"), None)
+    if base_at is None:
+        sys.exit(f"resolve: {path} has no 'base' stage")
+
+    # --- Follow the chain from the last stage back to the base -------------
+    # The repo stage is repo-stable for a default build, repo-other otherwise.
+    repo_stage = "stable" if args.repo == "stable" and args.repo_conf in ("", "stable") else "other"
+    chain, stage = [], stages[-1]
+    while True:
+        chain.append(stage)
+        image = stage["image"].replace("${_REPO_STAGE}", repo_stage)
+        parent = by_name.get(image)
+        if parent is None or parent is stage:
+            break
+        stage = parent
+    chain.reverse()
+
+    # --- Print: bootstrap stages above base, then the chain -----------------
+    out = list(preamble)
+    for s in stages[:base_at]:                        # bootstraps, for distros with no Docker Hub image
+        out += s["above"] + [s["from"]] + s["body"]
+    for s in chain:
+        body = s["body"]
+        has_instruction = any(l.strip() and not l.lstrip().startswith("#") for l in body)
+        if not has_instruction and s["name"] != "base":
+            continue
+        out += s["above"] + [s["from"]] + body
+    print("\n".join(out).rstrip("\n"))
+
+
+if __name__ == "__main__":
+    main()

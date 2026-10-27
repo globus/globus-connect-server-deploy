@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+############################################################################
+# check-dockerfiles - static checks on docker-files/Dockerfile.* and on what
+# scripts/export makes of them.  No Docker, no network.
+#
+# Usage: scripts/check-dockerfiles [-v|--verbose]
+#
+# Three groups of checks:
+#   structure   each Dockerfile has a family header, the expected stages in
+#               order, each under its banner, the build args that select
+#               between them, and ends with the stage 'final'
+#   user form   the default export (stable) has only the user stages and no
+#               REPO or REPO_CONF selection left in it
+#   exports     every repo exports to exactly the stages that build uses
+#
+# Mentions of developer tooling in the user form are warnings, not failures,
+# for now.  What the stages CONTAIN is checked by check-content.
+############################################################################
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GCS_DOCKER="${SCRIPT_DIR}/.."
+EXPORT="${GCS_DOCKER}/scripts/export"
+
+# shellcheck source=scripts/lib.sh
+. "${SCRIPT_DIR}/lib.sh"
+lib_scan_verbose "$@"
+
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+
+# The stages every Dockerfile must have, in order, and what the user form keeps.
+SOURCE_STAGES="base pre-repo repo-stable repo-other install final"
+USER_STAGES="base pre-repo repo-stable install final"
+WARNINGS=0
+
+# _stages <file> - the stage names from 'base' onward, space separated.  Distros
+# with no Docker Hub image have bootstrap stages above 'base'; those are skipped.
+_stages() {
+  sed -nE 's/^FROM[[:space:]].*[[:space:]]AS[[:space:]]+([A-Za-z0-9_.-]+).*/\1/p' "$1" \
+    | awk '$0 == "base" { on = 1 } on' | tr '\n' ' ' | sed 's/ $//'
+}
+
+# _banners <file> - for each '# STAGE: name' banner, 'name:as', where 'as' is the
+# stage the next FROM starts ('-' if that is not a FROM ... AS).  The two halves
+# match when the banner sits directly above its own FROM.
+_banners() {
+  awk '
+    /^# STAGE: / { want = $3; next }
+    want != "" && /^#/ { next }
+    want != "" {
+      as = "-"
+      if ($1 == "FROM" && $3 == "AS") as = $4
+      print want ":" as; want = ""
+    }' "$1"
+}
+
+# _first_line <regex> <file> - the number of the first matching line, or nothing.
+_first_line() { grep -nE "$1" "$2" | head -1 | cut -d: -f1 || true; }
+
+# _warn <id> <message> - counted and shown, but not a failure.
+_warn() {
+  WARNINGS=$(( WARNINGS + 1 ))
+  printf '  %swarning%s  %s — %s\n' "$YLW" "$RST" "$1" "$2"
+  return 0
+}
+
+############################################################################
+# STRUCTURE AND USER FORM, one Dockerfile at a time
+############################################################################
+for distro in "${DISTROS[@]}"; do
+  f="${DOCKERFILES}/Dockerfile.${distro}"
+  [[ -f "$f" ]] || continue
+  id="structure/${distro}"
+  _section "$id"
+
+  if got_family=$(distro_family "$distro" 2>&1); then
+    case "$got_family" in
+      deb|el|fedora|suse) _pass "${id}/family" ;;
+      *) _fail "${id}/family" "'# family:' is '${got_family}', expected deb, el, fedora or suse" ;;
+    esac
+  else _fail "${id}/family" "$got_family"; fi
+
+  # A parser directive only counts on the first line.
+  syn=$(_first_line '^# syntax=' "$f")
+  if [[ -z "$syn" || "$syn" == 1 ]]; then _pass "${id}/syntax-directive"
+  else _fail "${id}/syntax-directive" "'# syntax=' is on line ${syn}; it must be line 1"; fi
+
+  got=$(_stages "$f")
+  if [[ "$got" == "$SOURCE_STAGES" ]]; then _pass "${id}/stages"
+  else _fail "${id}/stages" "stages are '${got}', expected '${SOURCE_STAGES}'"; fi
+
+  # Every named stage has its banner directly above its FROM.
+  bad=$(_banners "$f" | awk -F: '$1 != $2' | tr '\n' ' ')
+  count=$(_banners "$f" | wc -l)
+  nstages=$(grep -cE '^FROM .* AS ' "$f")
+  if [[ -z "$bad" && "$count" -eq "$nstages" ]]; then _pass "${id}/banners"
+  else _fail "${id}/banners" "each '# STAGE: name' banner must sit directly above 'FROM ... AS name' (${count} banners, ${nstages} stages; mismatched: ${bad:-none})"; fi
+
+  first_from=$(_first_line '^FROM ' "$f")
+  arg='ARG _REPO_STAGE=other'
+  ln=$(_first_line "^${arg}\$" "$f")
+  if [[ -n "$ln" && "$ln" -lt "$first_from" ]]; then _pass "${id}/${arg// /-}"
+  else _fail "${id}/${arg// /-}" "'${arg}' must appear before the first FROM (it is used in FROM)"; fi
+
+  for arg in '^ARG _BASE_CACHEBUST=' '^ARG _CACHEBUST='; do
+    if grep -qE "$arg" "$f"; then _pass "${id}/${arg}"
+    else _fail "${id}/${arg}" "missing"; fi
+  done
+
+  if [[ "$(grep -E '^FROM ' "$f" | tail -1)" == 'FROM install AS final' ]]; then _pass "${id}/last-stage"
+  else _fail "${id}/last-stage" 'the last FROM must be exactly: FROM install AS final'; fi
+
+  # A step that adds another distro's repo must say so in the build output.
+  # (A notice that is only in a comment prints nothing, so comments don't count.)
+  code=$(grep -v '^[[:space:]]*#' "$f")
+  if grep -qE 'add-repo|addrepo|zypper ar |repofrompath' <<< "$code"; then
+    if grep -q 'GCS-DEPLOY-NOTICE:' <<< "$code"; then _pass "${id}/notice"
+    else _fail "${id}/notice" "adds a repo (add-repo, addrepo, repofrompath) but prints no 'GCS-DEPLOY-NOTICE: <text>' (see docker-files/README.md)"; fi
+  fi
+
+  # --- The user form: what 'make export' writes by default ---------------
+  out="${TMP}/${distro}.Dockerfile"
+  if ! err=$("$EXPORT" "$distro" 2>&1 >"$out"); then
+    _fail "user/${distro}/export" "$err"
+    continue
+  fi
+
+  cid="user/${distro}"
+  got=$(_stages "$out")
+  if [[ "$got" == "$USER_STAGES" ]]; then _pass "${cid}/stages"
+  else _fail "${cid}/stages" "stages are '${got}', expected '${USER_STAGES}'"; fi
+
+  if [[ "$(grep -E '^FROM ' "$out" | tail -1)" == 'FROM install AS final' ]]; then _pass "${cid}/last-stage"
+  else _fail "${cid}/last-stage" "the last FROM must be exactly: FROM install AS final"; fi
+
+  # Nothing about repos is left: no selector in a FROM, no ARG REPO or
+  # REPO_CONF, nothing but the stable setup.
+  for bad in '${REPO' 'ARG REPO' 'REPO_CONF' '_REPO_STAGE' 'repo-other'; do
+    if grep -qF -- "$bad" "$out"; then
+      _fail "${cid}/no-${bad}" "user file still contains '${bad}' (line $(grep -nF -- "$bad" "$out" | head -1 | cut -d: -f1))"
+    else
+      _pass "${cid}/no-${bad}"
+    fi
+  done
+
+  # Warning only: references to developer tooling in a file users read.
+  while IFS= read -r hit; do
+    _warn "$cid" "mentions developer tooling: ${hit}"
+  done < <(grep -nE 'scripts/build|build-logs|--skip' "$out" | head -3 || true)
+done
+
+############################################################################
+# EXPORTS: every repo
+#
+# Each export must keep exactly the stages a build with those args would run.
+############################################################################
+_section "Exports"
+for distro in "${DISTROS[@]}"; do
+  [[ -f "${DOCKERFILES}/Dockerfile.${distro}" ]] || continue
+  for repo in "${REPOS[@]}"; do
+    id="export/${distro}/${repo}"
+    if ! out=$("$EXPORT" "$distro" --repo "$repo" 2>&1); then
+      _fail "$id" "$(printf '%s' "$out" | head -1)"
+      continue
+    fi
+    want="base pre-repo repo-$(repo_stage "$repo") install final"
+    got=$(printf '%s\n' "$out" | _stages /dev/stdin)
+    if [[ "$got" == "$want" ]]; then _pass "$id"
+    else _fail "$id" "stages are '${got}', expected '${want}'"; fi
+  done
+  # The chosen values land in the ARGs the repo stage reads, and a pinned
+  # version in the ARG the install step reads.
+  out=$("$EXPORT" "$distro" --repo unstable --repo-conf pre-stable --gcs-version 5.4.100-rc1 2>&1) || true
+  id="export/${distro}/args"
+  if [[ "$(grep -c '^ARG REPO=unstable$' <<< "$out")" == 1 \
+     && "$(grep -c '^ARG REPO_CONF=pre-stable$' <<< "$out")" == 1 \
+     && "$(grep -c '^ARG GCS_VERSION=5.4.100-rc1$' <<< "$out")" == 1 ]]; then _pass "$id"
+  else _fail "$id" "export did not set ARG REPO, REPO_CONF and GCS_VERSION exactly once each"; fi
+  # Taking the repo definitions from elsewhere needs the general stage, even for stable.
+  id="export/${distro}/stable+repo-conf"
+  out=$("$EXPORT" "$distro" --repo stable --repo-conf pre-stable 2>&1) || true
+  got=$(printf '%s\n' "$out" | _stages /dev/stdin)
+  want="base pre-repo repo-other install final"
+  if [[ "$got" == "$want" ]]; then _pass "$id"
+  else _fail "$id" "stages are '${got}', expected '${want}'"; fi
+done
+
+if (( WARNINGS > 0 )); then
+  printf '\n  %s%d warning(s)%s: user-facing files mention developer tooling\n' "$YLW" "$WARNINGS" "$RST"
+fi
+
+report "dockerfile checks" "checks"

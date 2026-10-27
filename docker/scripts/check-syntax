@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+############################################################################
+# check-syntax - docker build --check on every Dockerfile
+#
+# Usage: scripts/check-syntax [-v|--verbose]
+#
+# BuildKit's own linter: it finds syntax errors and deprecated instructions
+# without running a build.  Each distro is checked twice: the source file, and
+# the user form that scripts/export writes.  One run on the source covers every
+# repo, because BuildKit lints all the stages, not only the ones a build
+# would use.
+#
+# Without Docker (or without permission to use it) this prints a warning and
+# exits 0, so 'make check' still works on a machine that has none.  That is
+# unlike scripts/build, which fails loudly because a build was asked for.
+############################################################################
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GCS_DOCKER="${SCRIPT_DIR}/.."
+DOCKERFILES="${GCS_DOCKER}/docker-files"
+EXPORT="${GCS_DOCKER}/scripts/export"
+
+# shellcheck source=scripts/lib.sh
+. "${SCRIPT_DIR}/lib.sh"
+lib_scan_verbose "$@"
+
+############################################################################
+# IS DOCKER USABLE?
+############################################################################
+if ! docker info >/dev/null 2>&1; then
+  printf '⚠️  Docker not available or not usable by current user — skipping syntax checks\n\n'
+  exit 0
+fi
+
+WORKDIR=$(mktemp -d)
+trap 'rm -rf "$WORKDIR"' EXIT
+
+############################################################################
+# RUN THE CHECKS
+#
+# One check can take a while (BuildKit may contact the registry for the base
+# image), so they run in parallel.  Each one's output goes to a file and is
+# judged afterwards, in order, so the report reads the same however the runs
+# finish.
+############################################################################
+
+JOBS=8
+
+# _run <n> <dockerfile> - one 'docker build --check'; output and exit status go
+# to files numbered <n>.
+_run() {
+  local rc=0
+  docker build --check -f "$2" "${DOCKERFILES}" >"${WORKDIR}/out.$1" 2>&1 || rc=$?
+  printf '%s' "$rc" > "${WORKDIR}/rc.$1"
+}
+
+IDS=()
+total=$(( ${#DISTROS[@]} * 2 ))
+
+printf 'Dockerfile syntax check — %d distros × (source + user form) = %d checks, %d at a time\n\n' \
+  "${#DISTROS[@]}" "$total" "$JOBS"
+
+# --- The queue: each distro's source file and its user form -----------------
+FILES=()
+for distro in "${DISTROS[@]}"; do
+  IDS+=("${distro}/source");  FILES+=("${DOCKERFILES}/Dockerfile.${distro}")
+  if "$EXPORT" "$distro" > "${WORKDIR}/Dockerfile.${distro}" 2>"${WORKDIR}/export.err"; then
+    IDS+=("${distro}/user"); FILES+=("${WORKDIR}/Dockerfile.${distro}")
+  else
+    _fail "${distro}/user" "export failed: $(head -1 "${WORKDIR}/export.err")"
+  fi
+done
+
+total=${#IDS[@]}
+running=0
+done_count=0
+_progress 0 "$total"
+for n in "${!IDS[@]}"; do
+  if (( running >= JOBS )); then
+    wait -n || true
+    running=$(( running - 1 )); done_count=$(( done_count + 1 ))
+    _progress "$done_count" "$total"
+  fi
+  _run "$n" "${FILES[$n]}" &
+  running=$(( running + 1 ))
+done
+wait
+
+############################################################################
+# JUDGE THE RESULTS, in queue order
+############################################################################
+for n in "${!IDS[@]}"; do
+  id="${IDS[$n]}"
+  rc=$(<"${WORKDIR}/rc.$n")
+  check_output=$(<"${WORKDIR}/out.$n")
+  _section "$id"
+  if [[ "$rc" -ne 0 ]]; then
+    _fail "$id/syntax" "docker build --check failed (exit $rc): $(printf '%s' "$check_output" | grep -iE 'error|warn' | head -3)"
+    if [[ $VERBOSE -eq 1 ]]; then printf '%s\n' "$check_output" | sed 's/^/        /'; fi
+  else
+    _pass "$id/syntax"
+    # A passing check can still carry warnings.  Progress lines such as
+    # "#1 [internal]..." and "Check complete, no warnings found." are always
+    # printed, so only an actual WARN line counts.
+    warn_lines=$(printf '%s' "$check_output" | grep -iE '\bWARN(ING)?\b' || true)
+    if [[ -n "$warn_lines" ]]; then
+      _fail "$id/warnings" "docker build --check warnings: $(printf '%s' "$warn_lines" | head -3)"
+      if [[ $VERBOSE -eq 1 ]]; then printf '%s\n' "$check_output" | sed 's/^/        /'; fi
+    fi
+  fi
+done
+
+report "syntax checks" "checks"

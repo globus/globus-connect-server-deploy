@@ -1,0 +1,376 @@
+#!/usr/bin/env bash
+############################################################################
+# check-content - what is IN the Dockerfiles
+#
+# Usage: scripts/check-content [-v|--verbose]
+#
+# For every distro and repo, this takes the Dockerfile a build would actually
+# use (scripts/resolve) and asserts what it contains: the right commands for the
+# family, the right repo, the stable repo disabled, the cache barrier in the
+# right place, and so on.  What the files look like (stages, banners, order) is
+# check-dockerfiles; this is the content.
+#
+# The knowledge tables below ARE the specification.  When a Dockerfile changes on
+# purpose, change the table.  When they disagree, one of the two is wrong:
+# find out which before editing either.
+############################################################################
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GCS_DOCKER="${SCRIPT_DIR}/.."
+DOCKERFILES="${GCS_DOCKER}/docker-files"
+RESOLVE="${SCRIPT_DIR}/resolve"
+
+# shellcheck source=scripts/lib.sh
+. "${SCRIPT_DIR}/lib.sh"
+lib_scan_verbose "$@"
+
+############################################################################
+# ASSERTIONS SPECIFIC TO THIS SUITE
+#
+# The general ones (assert_contains and so on) are in lib.sh.
+############################################################################
+
+# assert_disabled_before_refresh <family> <text> <id> - once globus-repo is
+# installed, the stable repo is disabled before the first index refresh, so a
+# non-stable build never fetches the stable index.  Skipped for dnf: it has no
+# refresh command of its own to order against.
+assert_disabled_before_refresh() {
+  local family="$1" text="$2" id="$3"
+  local refresh="${FAMILY_REFRESH[$family]}" disable="${FAMILY_DISABLE_STABLE[$family]}"
+  local code rest before
+  [[ -z "$refresh" ]] && return 0
+  code=$(printf '%s\n' "$text" | grep -v '^[[:space:]]*#')
+  rest="${code#*globus-repo}"
+  before="${rest%%"$disable"*}"
+  if [[ "$before" == *"$refresh"* ]]; then
+    _fail "$id" "'${refresh}' runs before the stable repo is disabled"
+  else
+    _pass "$id"
+  fi
+  return 0
+}
+
+############################################################################
+# KNOWLEDGE TABLES
+#
+# What each Dockerfile must contain, by repo and by family.  The list of
+# distros comes from the Dockerfiles themselves (lib.sh).
+############################################################################
+
+# Where repo-other downloads the globus-repo package from: the public site, or
+# the pre- mirror, which is that same URL behind 'builds.globus.org/'.  Both must
+# be there, since REPO_CONF can pick either whatever REPO is.
+REPO_CONF_SITES=(
+  'site=https://downloads.globus.org;'
+  'site=https://builds.globus.org/downloads.globus.org;'
+)
+
+# The rewrite a pre- repo does to the stanza it derives: the public URL gets the
+# mirror's host in front.
+PRE_REWRITE='s|https://downloads\.globus\.org/|https://builds.globus.org/downloads.globus.org/|'
+
+# Family -> the text by which repo-other turns a repo on (it is written once for
+# every repo, with the repo's name in a shell variable).
+declare -A FAMILY_ENABLE=(
+  [deb]='s/^#\s*deb /deb /'
+  [el]='config-manager --enable Globus-Connect-Server-5-${name}'
+  [fedora]='config-manager setopt Globus-Connect-Server-5-${name}.enabled=1'
+  [suse]='modifyrepo --enable Globus-Connect-Server-5-${name}'
+)
+
+# Family -> how systemctl is guarded against package updates.
+declare -A FAMILY_SYSTEMCTL_GUARD=(
+  [deb]="dpkg-divert"
+  [el]="excludepkgs=systemd"
+  [fedora]="excludepkgs=systemd"
+  [suse]="zypper addlock"
+)
+
+# Family -> the package manager's install command.
+declare -A FAMILY_PKG_INSTALL=(
+  [deb]="apt-get install"
+  [el]="dnf install"
+  [fedora]="dnf install"
+  [suse]="zypper install"
+)
+
+# How the install step pins GCS_VERSION.  apt wants the revision too, so it is
+# looked up in the index; dnf takes name-version, zypper name=version.  All
+# turn --version's 5.4.100-rc1 into the packages' 5.4.100~rc1.
+declare -A FAMILY_GCS_PIN=(
+  [deb]='apt-cache madison "${GCS_PACKAGE}"'
+  [el]='pkg="${GCS_PACKAGE}-$(printf '"'%s'"' "${GCS_VERSION}" | tr - '"'~'"')"'
+  [fedora]='pkg="${GCS_PACKAGE}-$(printf '"'%s'"' "${GCS_VERSION}" | tr - '"'~'"')"'
+  [suse]='pkg="${GCS_PACKAGE}=$(printf '"'%s'"' "${GCS_VERSION}" | tr - '"'~'"')"'
+)
+
+# Family -> the command that disables the stable repo.
+#
+# Every repo except 'stable' must run it.  globus-repo ships the stable repo
+# enabled (testing and unstable ship disabled), so a repo stage that only adds
+# its own repo leaves stable live, and GCS can install from stable instead.  On
+# deb that is worse than a version race: the package also pins origin
+# downloads.globus.org at priority 900 in /etc/apt/preferences.d/globus, which
+# beats the default 500 whatever the versions are.
+declare -A FAMILY_DISABLE_STABLE=(
+  [deb]='s/^\s*deb /# deb /'
+  [el]='config-manager --disable Globus-Connect-Server-5-Stable'
+  [fedora]='config-manager setopt Globus-Connect-Server-5-Stable.enabled=0'
+  [suse]='modifyrepo --disable Globus-Connect-Server-5-Stable'
+)
+
+# Family -> the command that refreshes the repo indexes.  The stable repo must be
+# disabled BEFORE the first one runs after globus-repo is installed, so a
+# non-stable build never fetches the stable index and cannot be broken by it.
+# (repo-other installs the package in one step and refreshes nothing; the next
+# step disables stable, then refreshes.)
+# Empty for dnf: it installs the globus-repo rpm before any Globus repo exists,
+# so there is no Globus index to read until later.
+declare -A FAMILY_REFRESH=(
+  [deb]='apt-get update'
+  [el]=''
+  [fedora]=''
+  [suse]='refresh'
+)
+
+# Family -> the command that updates every installed package.  Docker Hub images
+# lag the distro's security updates, so every image upgrades first.
+declare -A FAMILY_PKG_UPDATE=(
+  [deb]="apt-get -y upgrade"
+  [el]="dnf -y upgrade"
+  [fedora]="dnf -y upgrade"
+  [suse]="zypper --non-interactive update"
+)
+
+# Distro -> text that only that distro's install step has, with the reason in
+# the Dockerfile next to it.  A GCS install on a bare image otherwise lets the
+# solver pick a policy with no targeted store (selinux-policy-minimum), and
+# GCS's SELinux module fails to load.
+declare -A DISTRO_EXTRA=(
+  [almalinux-8]='dnf install -y selinux-policy-targeted "${pkg}"'
+  [oraclelinux-8]='dnf install -y selinux-policy-targeted "${pkg}"'
+  [redhat-8]='dnf install -y selinux-policy-targeted "${pkg}"'
+  [rockylinux-8]='dnf install -y selinux-policy-targeted "${pkg}"'
+  [springdale-8]='dnf install -y selinux-policy-targeted "${pkg}"'
+  [opensuse-16.0]='zypper install -y selinux-policy-targeted'
+  [sles-16.0]='zypper install -y selinux-policy-targeted'
+)
+
+# Distro -> the image its first FROM names (for centos and springdale, the
+# image the root file system is bootstrapped in).  A wrong tag here builds a
+# different distro than the file's name says.
+declare -A BASE_IMAGE=(
+  [almalinux-8]=almalinux:8
+  [almalinux-9]=almalinux:9
+  [almalinux-10]=almalinux:10
+  [centos-9]=almalinux:9
+  [centos-10]=almalinux:10
+  [debian-12]=debian:12
+  [debian-13]=debian:13
+  [fedora-43]=fedora:43
+  [fedora-44]=fedora:44
+  [opensuse-16.0]=opensuse/leap:16.0
+  [oraclelinux-8]=oraclelinux:8
+  [oraclelinux-9]=oraclelinux:9
+  [oraclelinux-10]=oraclelinux:10
+  [redhat-8]=registry.access.redhat.com/ubi8/ubi
+  [redhat-9]=registry.access.redhat.com/ubi9/ubi
+  [redhat-10]=registry.access.redhat.com/ubi10/ubi
+  [rockylinux-8]=rockylinux/rockylinux:8
+  [rockylinux-9]=rockylinux/rockylinux:9
+  [rockylinux-10]=rockylinux/rockylinux:10
+  [sles-15.7]=registry.suse.com/suse/sle15:15.7
+  [sles-16.0]=registry.suse.com/bci/bci-base:16.0
+  [springdale-8]=rockylinux/rockylinux:8-ubi
+  [springdale-9]=rockylinux/rockylinux:9-ubi
+  [ubuntu-22.04]=ubuntu:22.04
+  [ubuntu-24.04]=ubuntu:24.04
+  [ubuntu-26.04]=ubuntu:26.04
+)
+
+# The cache-busting build args.  Each must be declared AND used in every
+# Dockerfile: an ARG that is declared but never referenced leaves cache
+# invalidation to BuildKit's own heuristics, which we do not want to rely on.
+#
+#   _BASE_CACHEBUST opt-in; re-runs the distro update and everything below it
+#   _CACHEBUST      always passed by scripts/build; the cache barrier
+#
+# There is deliberately no third one for the repo or the install: everything
+# below the barrier is ours or Globus's and is never wanted from cache, so the
+# one barrier covers it.
+CACHEBUST_ARGS=(_BASE_CACHEBUST _CACHEBUST)
+
+############################################################################
+# MAIN LOOP: every distro x repo
+############################################################################
+
+total=$(( ${#DISTROS[@]} * ${#REPOS[@]} ))
+tested=0
+
+printf 'Dockerfile content — %d distros × %d repos = %d combinations\n' \
+  "${#DISTROS[@]}" "${#REPOS[@]}" "$total"
+
+for distro in "${DISTROS[@]}"; do
+  for repo in "${REPOS[@]}"; do
+    family="$(distro_family "$distro")"
+    id="${distro}/${repo}"
+    _section "$id"
+
+    df=$("$RESOLVE" "$distro" --repo "$repo" 2>/dev/null) || {
+      _fail "$id" "scripts/resolve exited non-zero"
+      tested=$(( tested + 1 ))
+      _progress "$tested" "$total"
+      continue
+    }
+
+    # --- Comments do not count ---------------------------------------
+    # A literal that also appears in a comment must not satisfy a check once
+    # the command itself is gone.
+    df=$(printf '%s\n' "$df" | grep -v '^[[:space:]]*#' || true)
+
+    # --- Systemctl layer content -----------------------------------
+    assert_contains "COPY systemctl/"                     "$df"  "$id/systemctl-COPY"
+    assert_contains "${FAMILY_SYSTEMCTL_GUARD[$family]}"  "$df"  "$id/systemctl-guard"
+    assert_matches  'ln -sf /gcs-deploy/systemctl-mock /(usr/)?bin/systemctl' \
+      "$df"  "$id/systemctl-symlink"
+
+    # --- Package manager -------------------------------------------
+    assert_contains "${FAMILY_PKG_INSTALL[$family]}"      "$df"  "$id/pkg-install-cmd"
+
+    # --- EPEL and dnf-plugins-core (EL family only, not Fedora) ----
+    # EPEL is installed in the systemd step via direct URL so it works on
+    # distros that don't carry epel-release in their base repos.
+    # dnf-plugins-core is co-installed there to guarantee 'dnf config-manager'
+    # is available before globus-repo's posttrans scriptlet runs.
+    if [[ "$family" == el ]]; then
+      assert_contains 'epel-release-latest-$(rpm -E %rhel)' "$df" "$id/epel-url"
+      assert_contains 'dnf-plugins-core'                    "$df" "$id/dnf-plugins-core"
+    fi
+
+    # --- Distro update ---------------------------------------------
+    assert_contains "${FAMILY_PKG_UPDATE[$family]}"       "$df"  "$id/pkg-update-cmd"
+
+    # --- Repo definitions come from the globus-repo package --------
+    # Never hand-written: a new signing key or a newly supported distro
+    # version lands in that package first, and a hand-rolled stanza would
+    # keep working against the old one.
+    assert_contains "globus-repo"       "$df"  "$id/repo-package"
+    assert_contains "installers/repo/"  "$df"  "$id/repo-url"
+
+    # --- Package signatures are always checked ------------------------
+    assert_not_contains "--nogpgcheck"  "$df"  "$id/no-nogpgcheck"
+    assert_not_contains "gpgcheck=0"    "$df"  "$id/no-gpgcheck-0"
+
+    if [[ "$repo" == stable ]]; then
+      # --- A default build uses the plain stable stage -------------------
+      # The one 'make export' keeps: a literal URL, and no trace of the
+      # machinery repo-other needs.
+      assert_contains     "https://downloads.globus.org/globus-connect-server/stable"  "$df"  "$id/stable-url"
+      assert_not_contains "ARG REPO_CONF="                                       "$df"  "$id/stable-plain"
+    else
+      # --- Every other repo goes through repo-other ----------------------
+      assert_contains "AS repo-other"                "$df"  "$id/other-stage"
+      for site in "${REPO_CONF_SITES[@]}"; do
+        assert_contains "$site"                      "$df"  "$id/conf-site:${site#site=https://}"
+      done
+      assert_contains 'ARG REPO_CONF='               "$df"  "$id/conf-arg"
+      assert_contains '${REPO_CONF:-${REPO}}'        "$df"  "$id/conf-default"
+      # The channel the globus-repo package comes from: as named, or, for a
+      # pre- repo, without the prefix.  Anything else must stop the build.
+      assert_contains 'channel=${conf} ;;'           "$df"  "$id/conf-channel"
+      assert_contains 'channel=${conf#pre-} ;;'      "$df"  "$id/conf-channel-pre"
+      assert_contains 'REPO_CONF must be'            "$df"  "$id/conf-validated"
+      assert_contains 'REPO must be'                 "$df"  "$id/repo-validated"
+
+      # --- It switches off stable, and on the repo it was asked for ------
+      assert_contains "${FAMILY_DISABLE_STABLE[$family]}"  "$df"  "$id/stable-disabled"
+      assert_disabled_before_refresh "$family" "$df" "$id/stable-disabled-first"
+      assert_contains "${FAMILY_ENABLE[$family]}"          "$df"  "$id/repo-enabled"
+
+      # --- A pre- repo derives its stanza, it does not invent one --------
+      assert_contains "$PRE_REWRITE"  "$df"  "$id/derived-from-public"
+      # apt's shipped pin outranks version comparison, so deb must repoint it.
+      if [[ "$family" == deb ]]; then
+        assert_contains "preferences.d/globus"  "$df"  "$id/apt-pin-repointed"
+      fi
+    fi
+
+    # --- Entrypoint ------------------------------------------------
+    assert_last_instruction "ENTRYPOINT"  "$df"  "$id/entrypoint-last"
+
+    # --- Cache-busting args ----------------------------------------
+    # Both layers are always included.
+    assert_contains "ARG _BASE_CACHEBUST="     "$df"  "$id/cachebust-base-declared"
+    assert_matches  '\$\{?_BASE_CACHEBUST\}?'  "$df"  "$id/cachebust-base-referenced"
+    assert_contains "ARG _CACHEBUST="          "$df"  "$id/cachebust-declared"
+    assert_matches  '\$\{?_CACHEBUST\}?'       "$df"  "$id/cachebust-referenced"
+
+    # --- Cache boundary --------------------------------------------
+    # The barrier must sit after the distro-provided layers and before
+    # anything of ours.  If this ever inverts, builds silently start
+    # shipping cached GCS packages.
+    assert_a_before_b "${FAMILY_PKG_UPDATE[$family]}" "ARG _CACHEBUST=" \
+      "$df"  "$id/barrier-after-update"
+    assert_a_before_b "ARG _CACHEBUST=" "COPY systemctl/" \
+      "$df"  "$id/barrier-before-mock"
+    assert_a_before_b "ARG _CACHEBUST=" "installers/repo/" \
+      "$df"  "$id/barrier-before-repo"
+    assert_a_before_b "COPY systemctl/" "installers/repo/" \
+      "$df"  "$id/mock-before-repo"
+
+    # --- GCS install and image content -------------------------------
+    assert_contains "globus-connect-server54"      "$df"  "$id/gcs-installed"
+    assert_matches  '(apt-get|dnf|zypper) install -y (selinux-policy-targeted )?"\$\{pkg\}"' \
+      "$df"  "$id/gcs-install-step"
+    if [[ -n "${DISTRO_EXTRA[$distro]-}" ]]; then
+      assert_contains "${DISTRO_EXTRA[$distro]}"   "$df"  "$id/distro-extra"
+    fi
+    assert_contains "ARG GCS_VERSION="             "$df"  "$id/gcs-version-arg"
+    assert_contains "${FAMILY_GCS_PIN[$family]}"   "$df"  "$id/gcs-version-pin"
+    assert_contains "EXPOSE 443"                   "$df"  "$id/expose"
+    assert_contains "entrypoint.sh"                "$df"  "$id/entrypoint-file"
+    # The GCS install must land below the barrier.
+    assert_a_before_b "ARG _CACHEBUST=" "globus-connect-server54" \
+      "$df"  "$id/barrier-before-gcs-install"
+
+    tested=$(( tested + 1 ))
+    _progress "$tested" "$total"
+  done
+done
+
+############################################################################
+# CACHEBUST COVERAGE: the whole files
+#
+# The checks above only see the stages one build selects.  This reads each
+# whole file, so a stage no build above picked cannot hide a missing arg.
+############################################################################
+
+_section "cachebust coverage across all Dockerfiles"
+for f in "${DOCKERFILES}"/Dockerfile.*; do
+  body=$(cat "$f")
+  rel="${f##*/}"
+  for var in "${CACHEBUST_ARGS[@]}"; do
+    assert_contains "ARG ${var}="        "$body"  "cachebust/${rel}/${var}/declared"
+    assert_matches  "\\\$\\{?${var}\\}?" "$body"  "cachebust/${rel}/${var}/referenced"
+  done
+done
+
+############################################################################
+# BASE IMAGES: the whole files
+############################################################################
+
+_section "base images"
+for distro in "${DISTROS[@]}"; do
+  first=$(grep -m1 '^FROM ' "${DOCKERFILES}/Dockerfile.${distro}" | awk '{print $2}')
+  want="${BASE_IMAGE[$distro]-}"
+  if [[ -z "$want" ]]; then
+    _fail "base-image/${distro}" "not in the BASE_IMAGE table"
+  elif [[ "$first" == "$want" ]]; then
+    _pass "base-image/${distro}"
+  else
+    _fail "base-image/${distro}" "first FROM is '${first}', expected '${want}'"
+  fi
+done
+
+report "content assertions" "assertions" " across ${tested} combinations"

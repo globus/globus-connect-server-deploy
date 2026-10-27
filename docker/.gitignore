@@ -1,4 +1,6 @@
 venv/
+__pycache__/
+.ruff_cache/
 
 # Editor swap files
 *.swp

@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+############################################################################
+# check-shell - static analysis of the shell and Python sources in this repo
+#
+# Usage: scripts/check-shell [-v|--verbose]
+#
+# Two levels, so it is useful on any machine:
+#   always       a parse check: 'bash -n' / 'sh -n' and 'python3 -m py_compile'
+#   if present   shellcheck and ruff
+#
+# Neither shellcheck nor ruff is required.  If one is missing it is reported
+# once and skipped, never a failure.
+############################################################################
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GCS_DOCKER="${SCRIPT_DIR}/.."
+
+# shellcheck source=scripts/lib.sh
+. "${SCRIPT_DIR}/lib.sh"
+lib_scan_verbose "$@"
+
+cd "$GCS_DOCKER"
+
+############################################################################
+# FIND THE SOURCES
+#
+# Files are found, not listed: a hardcoded list once silently dropped files
+# from the lint when paths moved.  The shebang says what a file is, so a new
+# script is covered as soon as it is written.  scripts/lib.sh has a shebang
+# only so it is found here; its 'shellcheck shell=bash' line is what makes the
+# linter treat it as a sourced fragment.
+############################################################################
+BASH_SOURCES=()
+SH_SOURCES=()
+PYTHON_SOURCES=()
+
+# _classify <file> - sort a file into BASH_SOURCES, SH_SOURCES or PYTHON_SOURCES
+# by its shebang; anything else is ignored.
+_classify() {
+  local f="$1" first
+  IFS= read -r first < "$f" || true
+  case "$first" in
+    '#!'*bash*)    BASH_SOURCES+=("$f") ;;
+    '#!'*/sh|'#!'*[[:space:]]sh) SH_SOURCES+=("$f") ;;
+    '#!'*python*)  PYTHON_SOURCES+=("$f") ;;
+  esac
+  return 0
+}
+
+while IFS= read -r _f; do _classify "$_f"; done < <(
+  find . -type f \
+       -not -path './.git/*' \
+       -not -path './build-logs/*' \
+       -not -path './venv/*' \
+       -not -path '*/__pycache__/*' \
+       -not -path './.ruff_cache/*' \
+       -not -name 'Dockerfile.*' \
+    | sed 's|^\./||' | sort
+)
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+SKIPPED=()
+
+############################################################################
+# PARSE CHECKS (always run)
+############################################################################
+
+# --- bash -n and sh -n ------------------------------------------------------
+# POSIX-sh scripts are parsed with 'sh -n', not 'bash -n': bash accepts
+# bashisms that would fail in a minimal container.
+_section "parse"
+for f in "${BASH_SOURCES[@]+${BASH_SOURCES[@]}}"; do
+  if err=$(bash -n "$f" 2>&1); then _pass "parse/$f"
+  else _fail "parse/$f" "$err"; fi
+done
+for f in "${SH_SOURCES[@]+${SH_SOURCES[@]}}"; do
+  if err=$(sh -n "$f" 2>&1); then _pass "parse-sh/$f"
+  else _fail "parse-sh/$f" "$err"; fi
+done
+
+# --- python3 -m py_compile --------------------------------------------------
+# PYTHONPYCACHEPREFIX sends the .pyc files to a temp directory.  Without it
+# py_compile leaves a __pycache__/ next to systemctl_mock.py, and that would
+# then be copied into every build context.
+_section "py_compile"
+PYCACHE=$(mktemp -d)
+trap 'rm -rf "$PYCACHE"' EXIT
+for f in "${PYTHON_SOURCES[@]+${PYTHON_SOURCES[@]}}"; do
+  if err=$(PYTHONPYCACHEPREFIX="$PYCACHE" python3 -m py_compile "$f" 2>&1); then
+    _pass "py_compile/$f"
+  else
+    _fail "py_compile/$f" "$err"
+  fi
+done
+
+############################################################################
+# LINTERS (only if installed)
+############################################################################
+
+# --- shellcheck -------------------------------------------------------------
+if have shellcheck; then
+  _section "shellcheck"
+  for kind in bash sh; do
+    if [[ $kind == bash ]]; then files=("${BASH_SOURCES[@]+${BASH_SOURCES[@]}}")
+    else files=("${SH_SOURCES[@]+${SH_SOURCES[@]}}"); fi
+    for f in "${files[@]+${files[@]}}"; do
+      [[ -f "$f" ]] || continue
+      if out=$(shellcheck --shell="$kind" --severity=warning "$f" 2>&1); then
+        _pass "shellcheck/$f"
+      else
+        _fail "shellcheck/$f" "$(printf '%s' "$out" | head -5)"
+        if [[ $VERBOSE -eq 1 ]]; then printf '%s\n' "$out" | sed 's/^/        /'; fi
+      fi
+    done
+  done
+else
+  SKIPPED+=("shellcheck")
+fi
+
+# --- ruff -------------------------------------------------------------------
+if have ruff; then
+  _section "ruff"
+  for f in "${PYTHON_SOURCES[@]+${PYTHON_SOURCES[@]}}"; do
+    [[ -f "$f" ]] || continue
+    if out=$(ruff check "$f" 2>&1); then
+      _pass "ruff/$f"
+    else
+      _fail "ruff/$f" "$(printf '%s' "$out" | head -5)"
+      if [[ $VERBOSE -eq 1 ]]; then printf '%s\n' "$out" | sed 's/^/        /'; fi
+    fi
+  done
+else
+  SKIPPED+=("ruff")
+fi
+
+if (( ${#SKIPPED[@]} > 0 )); then
+  printf '⚠️  not installed, skipped: %s\n' "${SKIPPED[*]}"
+fi
+
+report "static checks" "checks"

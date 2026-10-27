@@ -10,6 +10,9 @@
   script that mimics systemctl) that runs the unit files the GCS packages
   install, with drop-ins for the container. This includes the OIDC service,
   which the old entrypoint could not start
+* Docker: the entrypoint reads the deployment key from /deployment-key.json
+  (mount it with --volume) instead of GLOBUS_CLIENT_ID, GLOBUS_CLIENT_SECRET
+  and DEPLOYMENT_KEY, and exits 1 when a GCS service dies
 
 3.0.0: Fri Mar 6 3:40:00 PM CDT 2026
 * Added Terraform installation and management support

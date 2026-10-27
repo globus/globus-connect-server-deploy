@@ -13,6 +13,16 @@
 * Docker: the entrypoint reads the deployment key from /deployment-key.json
   (mount it with --volume) instead of GLOBUS_CLIENT_ID, GLOBUS_CLIENT_SECRET
   and DEPLOYMENT_KEY, and exits 1 when a GCS service dies
+* Docker: each distro has one readable Dockerfile that installs GCS from the
+  Globus package repository. The generated Dockerfiles (templates, partials,
+  make docker-files) and the Ansible run inside the image are gone
+* Docker: new build argument GCS_VERSION installs a specific GCS version;
+  CACHEBUST is now _CACHEBUST, and _BASE_CACHEBUST re-runs the distro package
+  update
+* Docker: removed docker-build-gcs.sh, docker-run-gcs and the test/ directory.
+  The README shows the docker build and docker run commands; images are
+  tagged with whatever you pass to --tag, and docker-run-gcs's options now
+  go in the NODE_SETUP_ARGS environment variable
 
 3.0.0: Fri Mar 6 3:40:00 PM CDT 2026
 * Added Terraform installation and management support

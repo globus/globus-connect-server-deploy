@@ -1,0 +1,4 @@
+# Not part of what the Dockerfiles COPY; keep the build context small.
+Dockerfile.*
+template.Dockerfile
+README.md

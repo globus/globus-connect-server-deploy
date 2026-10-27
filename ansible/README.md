@@ -18,7 +18,7 @@
 </details>
 
 ## About The Project
-This project provides tools that support the deployment of [Globus Connect Server](https://www.globus.org/globus-connect) using Ansible. It serves as a starting point for endpoint administrators interested in automated deployment for production or testing purposes. Ansible knowledge is assumed since the examples will most likely need to be adapted to fit your environment.
+This project provides an Ansible playbook that installs [Globus Connect Server](https://www.globus.org/globus-connect) from the stable repository on supported Linux distributions. It serves as a starting point for endpoint administrators interested in automated deployment. Ansible knowledge is assumed since the examples will most likely need to be adapted to fit your environment.
 
 **GCSv5 has its own officially-supported [installation procedures](https://docs.globus.org/globus-connect-server-v5-installation-guide/)**. This installer does not replace that process and it is likely that updates to this installer repo will lag feature releases of GCSv5.
 

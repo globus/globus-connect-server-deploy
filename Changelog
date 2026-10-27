@@ -4,6 +4,7 @@
 * Ansible: the playbook can only install from the stable repository now;
   removed the gcs_repo variable (unstable, testing, pre-stable) and the
   gcs_proxy variable
+* Ansible: a failed EPEL key import no longer starts the interactive debugger
 
 3.0.0: Fri Mar 6 3:40:00 PM CDT 2026
 * Added Terraform installation and management support

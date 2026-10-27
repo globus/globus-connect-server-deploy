@@ -18,7 +18,6 @@
     key: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_facts['distribution_major_version'] }}
   when:
     - ansible_facts['distribution'] != "Fedora"
-  debugger: on_failed
 
 - name: Install the EPEL repository
   become: yes

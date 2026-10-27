@@ -35,6 +35,8 @@
 * Docker: make check lints and checks the Dockerfiles and scripts
 * Docker: make images builds the images and verifies them; make clean and
   make clobber remove the logs and the images
+* Docker: documented the Dockerfile layout (docker-files/README.md) and added
+  docker-files/template.Dockerfile for new distros
 
 3.0.0: Fri Mar 6 3:40:00 PM CDT 2026
 * Added Terraform installation and management support

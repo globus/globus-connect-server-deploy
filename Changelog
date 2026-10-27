@@ -37,6 +37,7 @@
   make clobber remove the logs and the images
 * Docker: documented the Dockerfile layout (docker-files/README.md) and added
   docker-files/template.Dockerfile for new distros
+* Docker: added docker/DEVELOPING.md for people who change the Dockerfiles
 
 3.0.0: Fri Mar 6 3:40:00 PM CDT 2026
 * Added Terraform installation and management support

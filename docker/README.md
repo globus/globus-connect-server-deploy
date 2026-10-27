@@ -80,6 +80,8 @@ To look around in an image without starting GCS (the entrypoint needs the deploy
 $ docker run -it --entrypoint /bin/bash globus/globus-connect-server:ubuntu-22.04
 ```
 
+Maintainers who change the Dockerfiles or build and verify images for every distro: see [DEVELOPING.md](DEVELOPING.md).
+
 #### Launching a GCS Container
 Mount the deployment key into the container and launch it. The container will run `globus-connect-server node setup` automatically, start all GCS services, and monitor them until the container is stopped.
 
